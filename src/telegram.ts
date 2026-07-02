@@ -10,7 +10,9 @@ export interface TelegramPort {
   sendMessage(args: { chatId: number; text: string }): Promise<{ messageId: number }>;
 }
 
-export type TelegramBotApiPortOptions = TelegramClientOptions;
+export type TelegramBotApiPortOptions = TelegramClientOptions & {
+  createClient?: (options: TelegramClientOptions) => Pick<TelegramBotApiClient, "sendMessage">;
+};
 export type { TelegramApiResponse, TelegramRequestInit } from "smithers-orchestrator/telegram";
 export { TELEGRAM_API_ROOT, TelegramBotApiError, TelegramNetworkError } from "smithers-orchestrator/telegram";
 
@@ -18,7 +20,8 @@ export class TelegramBotApiPort implements TelegramPort {
   private readonly client: Pick<TelegramBotApiClient, "sendMessage">;
 
   constructor(options: TelegramBotApiPortOptions) {
-    this.client = createTelegramClient(options);
+    const { createClient, ...clientOptions } = options;
+    this.client = (createClient ?? createTelegramClient)(clientOptions);
   }
 
   async sendMessage({ chatId, text }: { chatId: number; text: string }): Promise<{ messageId: number }> {
