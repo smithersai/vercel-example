@@ -1,0 +1,20 @@
+$ next build
+   ▲ Next.js 15.5.9
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 1768ms
+   Linting and checking validity of types ...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next/types/**/*.ts'
+
+Failed to compile.
+
+app/api/cron/summary/route.ts
+Type error: Route "app/api/cron/summary/route.ts" does not match the required types of a Next.js Route.
+  "createCronGet" is not a valid Route export field.
+
+Next.js build worker exited with code: 1 and signal: null
+error: script "build" exited with code 1

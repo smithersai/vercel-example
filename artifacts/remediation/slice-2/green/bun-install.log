@@ -1,0 +1,11 @@
+bun install v1.3.14 (0d9b296a)
+Resolving dependencies
+Resolved, downloaded and extracted [0]
+Saved lockfile
+
++ @types/node@22.20.0 (v26.1.0 available)
++ @types/react@19.2.17
++ @types/react-dom@19.2.3
++ next@15.5.9
+
+8 packages installed [793.00ms]
