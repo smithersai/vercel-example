@@ -1,15 +1,31 @@
+# Smithers/runtime state
 .smithers/worktrees/
-smithers.db*
 .smithers/*.db*
+smithers.db*
+*.db
+*.sqlite
 *.db-shm
 *.db-wal
+
+# Dependencies, builds, and local caches
 node_modules/
-coverage/
-tsconfig.tsbuildinfo
 .next/
+coverage/
+dist/
+out/
 .tmp/
 .bun-cache/
+.bun-link/
+.turbo/
+*.tsbuildinfo
+
+# Local env/secrets
 .env
-.env*.local
+.env.*
+!.env.example
+.envrc
+
+# Local tool state
 run-*.log
-.vercel
+.vercel/
+.DS_Store

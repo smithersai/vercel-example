@@ -54,10 +54,26 @@ Copy `.env.example` to `.env.local` and fill in real values.
 
 ## Local development
 
-1. `docker compose up -d` (set `POSTGRES_PORT` if 5432 is busy).
-2. Copy `.env.example` to `.env.local` and replace the placeholder secrets.
-3. `bun install && bun run migrate`
-4. `bun run dev`
+1. Install dependencies with `bun install`.
+2. Start Postgres with `docker compose up -d`. If port 5432 is busy, run
+   `POSTGRES_PORT=5433 docker compose up -d` and update `DATABASE_URL` in
+   `.env.local` to use port 5433.
+3. Copy `.env.example` to `.env.local` and replace the placeholder
+   `TELEGRAM_WEBHOOK_SECRET`, `OPERATOR_SECRET`, and `CRON_SECRET` values.
+   Leave `TELEGRAM_BOT_TOKEN` blank for deterministic local fake-outbox delivery,
+   or set it with `TELEGRAM_DELIVERY_MODE=real` for a live Telegram smoke test.
+4. Apply the database schema with `bun run migrate`.
+5. Start the app with `bun run dev`, then open `http://127.0.0.1:3000`.
+
+Useful local route checks:
+
+- Export the matching secrets first, for example `set -a; source .env.local; set +a`.
+- Manual summary enqueue:
+  `curl -X POST http://127.0.0.1:3000/api/trigger -H "authorization: Bearer $OPERATOR_SECRET" -H "content-type: application/json" -d '{"chatId":1,"windowStart":"2026-07-02T00:00:00.000Z","windowEnd":"2026-07-02T01:00:00.000Z"}'`
+- Queue drain:
+  `curl -X POST http://127.0.0.1:3000/api/queue/drain -H "authorization: Bearer $CRON_SECRET"`
+- Fake outbox, when `E2E_TEST_ROUTES=1`:
+  `curl http://127.0.0.1:3000/api/test/outbox -H "authorization: Bearer $OPERATOR_SECRET"`
 
 Real Telegram delivery goes through the first-class `smithers-orchestrator/telegram`
 Bot API helper behind this app's narrow `TelegramPort`. If `TELEGRAM_BOT_TOKEN` is not
@@ -84,8 +100,10 @@ Run the Smithers gateway and the app in separate terminals:
 dashboard WebSocket path `/smithers-ws` to `SMITHERS_GATEWAY_URL`, defaulting to
 `http://127.0.0.1:7331`. These proxy paths use the same operator cookie and fail
 closed when `OPERATOR_SECRET` is missing. The dashboard waits until browser mount
-to connect, so production builds do not fetch the gateway and render a disconnected
-state when no gateway is reachable.
+to connect, so production builds do not fetch the gateway. Set
+`NEXT_PUBLIC_SMITHERS_GATEWAY_URL` only when the browser should connect directly
+to a separately reachable gateway; otherwise leave it blank and use the same-origin
+rewrites above.
 
 ## Tests and gates
 
@@ -106,10 +124,27 @@ and push to `main`.
 
 ## Deploy
 
-Deploy to Vercel with the environment variables above configured, including
-`TELEGRAM_BOT_TOKEN` for real Telegram sends. Production startup fails fast when the token
-is missing unless `TELEGRAM_DELIVERY_MODE=fake` is explicitly set for a non-delivery
-environment. `vercel.json` schedules Vercel Cron to hit `/api/cron/summary` hourly; set
-`CRON_SECRET` so Vercel authenticates those invocations. Do not set `E2E_TEST_ROUTES` in
-production — the fake outbox route additionally hard-404s whenever `NODE_ENV` or
-`VERCEL_ENV` is `production`.
+1. Create or link the Vercel project with `vercel link`.
+2. Attach a Postgres database, such as Neon through the Vercel Marketplace, and set
+   `DATABASE_URL` for Preview and Production.
+3. Set these required secrets in Vercel for the target environment:
+   `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`, `OPERATOR_SECRET`, and
+   `CRON_SECRET`. Production startup fails fast when `TELEGRAM_BOT_TOKEN` is
+   missing unless `TELEGRAM_DELIVERY_MODE=fake` is explicitly set for a
+   non-delivery environment.
+4. Set `E2E_TEST_ROUTES=1` only for Preview deployments that need the fake outbox
+   route; never set it to `1` in Production. The route also hard-404s whenever
+   `NODE_ENV` or `VERCEL_ENV` is `production`.
+5. Run migrations against the target database before testing or promoting:
+   `vercel env run -e preview -- bun run migrate` for Preview, or
+   `vercel env run -e production -- bun run migrate` for Production. To inspect
+   synced values first, use `vercel env pull .env.preview.local --environment=preview`
+   or `vercel env pull .env.production.local --environment=production`.
+6. Deploy a Preview with `vercel deploy` or `vercel deploy --target=preview`.
+   Deploy Production with `vercel deploy --prod`.
+7. Register the Telegram webhook for the deployed URL:
+   `curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" -d "url=https://<deployment-host>/api/telegram/webhook" -d "secret_token=$TELEGRAM_WEBHOOK_SECRET"`.
+
+`vercel.json` schedules Vercel Cron to hit `/api/cron/summary` hourly in
+Production. Vercel adds `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET`
+is configured on the project, matching the route's bearer-token check.
