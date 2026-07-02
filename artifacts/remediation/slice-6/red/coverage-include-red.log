@@ -1,0 +1,82 @@
+$ vitest run --coverage
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+      Coverage enabled with v8
+
+Failed to parse file:///Users/williamcory/vercel-example/app/layout.tsx. Excluding it from coverage.
+ Error [RolldownError]: Parse failed with 1 error:
+Expected `from` but found `{`
+1: import type { ReactNode } from "react";
+               ^
+2: 
+3: export default function RootLayout({ children }: { children: ReactNode }) {
+    at error (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/shared/logs-aMKUxRpj.mjs:147:24)
+    at normalizeParseError (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/parse-ast-index.mjs:25:9)
+    at wrap (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/parse-ast-index.mjs:5:39)
+    at parseAstAsync (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/parse-ast-index.mjs:54:9)
+    at V8CoverageProvider.remapCoverage (file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:133:10)
+    at file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:119:23
+    at async Promise.all (index 0)
+    at V8CoverageProvider.getCoverageMapForUncoveredFiles (file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:109:4)
+    at V8CoverageProvider.generateCoverage (file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:56:29)
+    at file:///Users/williamcory/vercel-example/node_modules/vitest/dist/chunks/cli-api.24X8XwN1.js:13604:23 {
+  code: 'PARSE_ERROR',
+  id: undefined,
+  pos: 12
+}
+Failed to parse file:///Users/williamcory/vercel-example/app/page.tsx. Excluding it from coverage.
+ Error [RolldownError]: Parse failed with 1 error:
+Unexpected JSX expression
+1: export default function Page() {
+2:   return (
+3:     <main>
+       ^
+4:       <h1>Smithers Telegram Summary Bot</h1>
+5:       <p>Serverless Telegram summaries backed by Postgres on Vercel.</p>
+    at error (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/shared/logs-aMKUxRpj.mjs:147:24)
+    at normalizeParseError (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/parse-ast-index.mjs:25:9)
+    at wrap (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/parse-ast-index.mjs:5:39)
+    at parseAstAsync (file:///Users/williamcory/vercel-example/node_modules/rolldown/dist/parse-ast-index.mjs:54:9)
+    at V8CoverageProvider.remapCoverage (file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:133:10)
+    at file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:119:23
+    at async Promise.all (index 1)
+    at V8CoverageProvider.getCoverageMapForUncoveredFiles (file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:109:4)
+    at V8CoverageProvider.generateCoverage (file:///Users/williamcory/vercel-example/node_modules/@vitest/coverage-v8/dist/provider.js:56:29)
+    at file:///Users/williamcory/vercel-example/node_modules/vitest/dist/chunks/cli-api.24X8XwN1.js:13604:23 {
+  code: 'PARSE_ERROR',
+  id: undefined,
+  pos: 48
+}
+
+ Test Files  8 passed (8)
+      Tests  34 passed (34)
+   Start at  09:06:45
+   Duration  2.53s (transform 136ms, setup 75ms, import 543ms, tests 665ms, environment 1ms)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   93.78 |    97.32 |   95.34 |   93.61 |                   
+ ...i/cron/summary |       0 |      100 |     100 |       0 |                   
+  route.ts         |       0 |      100 |     100 |       0 | 3-4               
+ ...legram/webhook |       0 |      100 |     100 |       0 |                   
+  route.ts         |       0 |      100 |     100 |       0 | 3                 
+ ...pi/test/outbox |       0 |      100 |     100 |       0 |                   
+  route.ts         |       0 |      100 |     100 |       0 | 3                 
+ app/api/trigger   |       0 |      100 |     100 |       0 |                   
+  route.ts         |       0 |      100 |     100 |       0 | 3                 
+ src               |     100 |       98 |     100 |     100 |                   
+  container.ts     |     100 |     90.9 |     100 |     100 | 28                
+ src/db            |   82.14 |     92.3 |      75 |   82.14 |                   
+  migrate.ts       |   54.54 |    66.66 |      50 |   54.54 | 20-27             
+ src/routes        |   97.26 |    97.95 |     100 |   97.26 |                   
+  trigger.ts       |      90 |    94.11 |     100 |      90 | 33,51             
+-------------------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : 93.78% ( 181/193 )
+Branches     : 97.32% ( 109/112 )
+Functions    : 95.34% ( 41/43 )
+Lines        : 93.61% ( 176/188 )
+================================================================================

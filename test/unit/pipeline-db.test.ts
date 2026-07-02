@@ -243,6 +243,82 @@ describe("executeRun", () => {
     expect(sentTexts[0]).toContain("- verify");
     expect(pool.calls).toHaveLength(7);
   });
+
+  it("marks the run failed with the error and rethrows when execution blows up mid-run", async () => {
+    const pool = new ScriptedPool([
+      {
+        rows: [
+          {
+            chat_id: "42",
+            window_start: new Date("2026-07-02T00:00:00.000Z"),
+            window_end: new Date("2026-07-02T01:00:00.000Z"),
+            status: "pending",
+          },
+        ],
+        rowCount: 1,
+      },
+      { rows: [], rowCount: 1 },
+      { rows: [], rowCount: 0 },
+      { rows: [], rowCount: 0 },
+      { rows: [], rowCount: 1 },
+    ]);
+
+    await expect(
+      executeRun(
+        {
+          pool,
+          telegram: { sendMessage: async () => ({ messageId: 1 }) },
+          summarizer: {
+            summarize: async () => {
+              throw new Error("summarizer unavailable");
+            },
+          },
+        },
+        902,
+      ),
+    ).rejects.toThrow("summarizer unavailable");
+
+    const failureMark = pool.calls[4];
+    expect(failureMark.text).toContain("'failed'");
+    expect(failureMark.text).toContain("attempt_count");
+    expect(failureMark.params?.[0]).toBe(902);
+    expect(String(failureMark.params?.[1])).toContain("summarizer unavailable");
+  });
+
+  it("still surfaces the original error when the failure mark itself cannot be written", async () => {
+    const pool = new ScriptedPool([
+      {
+        rows: [
+          {
+            chat_id: "42",
+            window_start: new Date("2026-07-02T00:00:00.000Z"),
+            window_end: new Date("2026-07-02T01:00:00.000Z"),
+            status: "pending",
+          },
+        ],
+        rowCount: 1,
+      },
+      { rows: [], rowCount: 1 },
+      { rows: [], rowCount: 0 },
+      { rows: [], rowCount: 0 },
+      new Error("database gone"),
+    ]);
+
+    await expect(
+      executeRun(
+        {
+          pool,
+          telegram: { sendMessage: async () => ({ messageId: 1 }) },
+          summarizer: {
+            summarize: async () => {
+              throw new Error("summarizer unavailable");
+            },
+          },
+        },
+        903,
+      ),
+    ).rejects.toThrow("summarizer unavailable");
+  });
 });
 
 describe("container and pool wiring", () => {

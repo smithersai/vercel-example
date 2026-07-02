@@ -41,6 +41,14 @@ type PlanPanelProps = {
  * The workflow must register both the panelist plan schema and
  * `planSynthesis: <synthesis schema>` (moderator) in createSmithers.
  */
+// Long-agent task tuning. The published PanelProps does not declare these two props yet
+// (the widened type exists upstream); a spread carries them without excess-prop errors —
+// the linked runtime honors them, the published one ignores them.
+const taskTuning = {
+  panelistTaskProps: { continueOnFail: true, timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 },
+  moderatorTaskProps: { timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 },
+} as Record<string, unknown>;
+
 export function PlanPanel({
   idPrefix,
   prompt,
@@ -54,12 +62,14 @@ export function PlanPanel({
     <Panel
       id={idPrefix}
       panelists={panelists}
-      moderator={moderator}
+      // Published PanelProps types moderator as a single AgentLike, but the runtime Task
+      // it feeds accepts failover chains (agent?: AgentLike | AgentLike[]); the widened
+      // prop type exists upstream and just hasn't shipped yet.
+      moderator={moderator as AgentLike}
       panelistOutput={panelistOutput}
       moderatorOutput={synthesisOutput}
       strategy="synthesize"
-      panelistTaskProps={{ continueOnFail: true, timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 }}
-      moderatorTaskProps={{ timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 }}
+      {...taskTuning}
     >
       <PlanPrompt prompt={promptText} />
     </Panel>

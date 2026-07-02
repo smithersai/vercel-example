@@ -1,0 +1,32 @@
+$ vitest run --coverage
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+      Coverage enabled with v8
+
+
+ Test Files  5 passed | 1 skipped (6)
+      Tests  21 passed | 4 skipped (25)
+   Start at  08:43:10
+   Duration  979ms (transform 75ms, setup 47ms, import 243ms, tests 60ms, environment 0ms)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   92.52 |    90.82 |   90.69 |    92.3 |                   
+ src               |     100 |       90 |     100 |     100 |                   
+  container.ts     |     100 |    54.54 |     100 |     100 | 28-34             
+ src/db            |   67.85 |    84.61 |      50 |   67.85 |                   
+  migrate.ts       |   18.18 |    33.33 |       0 |   18.18 | 10-15,20-27       
+ src/routes        |   93.65 |    93.47 |     100 |   93.65 |                   
+  cron-summary.ts  |   95.23 |     90.9 |     100 |   95.23 | 64                
+  outbox.ts        |      90 |     90.9 |     100 |      90 | 36                
+  trigger.ts       |      90 |    94.11 |     100 |      90 | 33,51             
+-------------------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : 92.52% ( 161/174 )
+Branches     : 90.82% ( 99/109 )
+Functions    : 90.69% ( 39/43 )
+Lines        : 92.3% ( 156/169 )
+================================================================================

@@ -1,0 +1,1 @@
+.smithers/workflows/kanban.tsx(168,36): error TS7006: Parameter 'args' implicitly has an 'any' type.

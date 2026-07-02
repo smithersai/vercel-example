@@ -89,18 +89,32 @@ type ReviewPanelProps = {
  * the moderator merges them into a single reviewSynthesisSchema verdict at the
  * node `${idPrefix}-moderator`. Read that verdict with `reviewGate`.
  */
+// See PlanPanel: published PanelProps lacks these task-tuning props; spread them through.
+const reviewTaskTuning = {
+  panelistTaskProps: { continueOnFail: true, timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 },
+  moderatorTaskProps: { continueOnFail: true, timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 },
+} as Record<string, unknown>;
+
 export function ReviewPanel({ idPrefix, prompt, agents, moderator = defaultSynthesizer }: ReviewPanelProps) {
   const promptText = typeof prompt === "string" ? prompt : JSON.stringify(prompt ?? null);
+  // Normalize every entry to a config so plain agents AND failover chains ride the
+  // config.agent slot, which the runtime hands straight to Task (agent accepts
+  // AgentLike | AgentLike[]). Task ids are unchanged: the runtime falls back to
+  // `panelist-${i}` for unlabeled configs exactly as it does for bare agents. Published
+  // PanelProps still types config.agent as a single AgentLike — the widened type exists
+  // upstream but hasn't shipped — hence the cast.
+  const panelConfigs = agents.map((entry) =>
+    !Array.isArray(entry) && typeof entry === "object" && "agent" in entry ? entry : { agent: entry },
+  ) as { agent: AgentLike; role?: string; label?: string }[];
   return (
     <Panel
       id={idPrefix}
-      panelists={agents}
-      moderator={moderator}
+      panelists={panelConfigs}
+      moderator={moderator as AgentLike}
       panelistOutput={reviewOutputSchema}
       moderatorOutput={reviewSynthesisSchema}
       strategy="synthesize"
-      panelistTaskProps={{ continueOnFail: true, timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 }}
-      moderatorTaskProps={{ continueOnFail: true, timeoutMs: 1_800_000, heartbeatTimeoutMs: 600_000 }}
+      {...reviewTaskTuning}
     >
       <ReviewPrompt reviewer="review panelist" prompt={promptText} />
     </Panel>

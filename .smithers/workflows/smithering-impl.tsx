@@ -38,8 +38,9 @@
 //   - Worktree paths are resolved ONLY via ctx.worktreePath(id) ?? ctx.resolveWorktreePath(path).
 //   - Verdicts are captured FROM DISK (verify.json / review.json / challenge.json inside the
 //     worktree), never from agent structured returns.
-//   - NEVER merges to main. Work lands on `smithering/integration`; merging that branch into
-//     main is a human act after delivery.
+//   - NEVER merges to main. Work lands on the run-scoped `smithering/<runId>/integration`
+//     branch (see integrationBranch()); merging that branch into main is a human act after
+//     delivery.
 //   - Every loop has maxIterations. No custom side-effecting tools are defined; no `cache`
 //     prop is used anywhere (side-effect tasks are never cached).
 //   - Transient/infra errors (SESSION_ERROR, OOM, timeouts, rate limits) retry as infra and,
@@ -352,7 +353,7 @@ function classifyGateOutput(kind: "tsc" | "test" | "other", out: string, exitCod
   return "red";
 }
 
-function runGate(kind: "tsc" | "test" | "other", command: string, args: string[], cwd: string): GateResult {
+function runGate(kind: "tsc" | "test" | "other", command: string, args: string[], cwd: string, extraEnv: Record<string, string> = {}): GateResult {
   let lastOut = "";
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const res = spawnSync(command, args, {
@@ -360,7 +361,7 @@ function runGate(kind: "tsc" | "test" | "other", command: string, args: string[]
       encoding: "utf8",
       timeout: 25 * 60 * 1000,
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=6144", CI: "1" },
+      env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=6144", CI: "1", ...extraEnv },
     });
     lastOut = `${res.stdout ?? ""}\n${res.stderr ?? ""}`;
     const verdict = classifyGateOutput(kind, lastOut, res.status, res.signal as string | null);
@@ -397,7 +398,7 @@ function ticketNamedChecks(t: Ticket): Array<{ name: string; kind: "tsc" | "test
 
 function runGateSet(
   cwd: string,
-  gates: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[]; available: boolean; requiredWhenScaffolded?: boolean }>,
+  gates: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[]; env?: Record<string, string>; available: boolean; requiredWhenScaffolded?: boolean }>,
 ): { verdict: "green" | "red" | "infra"; results: Array<{ name: string; status: GateResult["status"]; log: string }> } {
   // Bootstrap exception ONLY: with no package.json at all (pre-walking-skeleton) a missing
   // script is `unavailable`. Once the tree is scaffolded, a missing REQUIRED gate is RED —
@@ -415,7 +416,7 @@ function runGateSet(
       }
       continue;
     }
-    const r = runGate(gate.kind, gate.command, gate.args, cwd);
+    const r = runGate(gate.kind, gate.command, gate.args, cwd, gate.env);
     results.push({ name: gate.name, status: r.status, log: r.log });
     if (r.status === "red") verdict = "red";
     else if (r.status === "infra" && verdict !== "red") verdict = "infra";
@@ -430,7 +431,7 @@ function runGateSet(
 function runTier1Gates(cwd: string, extraChecks: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[] }> = []) {
   const scripts = packageScripts(cwd);
   const gitleaksAvailable = spawnSync("gitleaks", ["version"], { encoding: "utf8" }).status === 0;
-  const gates: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[]; available: boolean; requiredWhenScaffolded?: boolean }> = [
+  const gates: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[]; env?: Record<string, string>; available: boolean; requiredWhenScaffolded?: boolean }> = [
     { name: "tsc", kind: "tsc", command: "npx", args: ["tsc", "--noEmit"], available: existsSync(join(cwd, "tsconfig.json")) },
     { name: "coverage-100 (REQ-10.1)", kind: "test", command: "pnpm", args: ["test:coverage"], available: Boolean(scripts["test:coverage"]) },
     { name: "test:unit", kind: "test", command: "pnpm", args: ["test:unit"], available: Boolean(scripts["test:unit"]) },
@@ -455,12 +456,15 @@ function runTier1Gates(cwd: string, extraChecks: Array<{ name: string; kind: "ts
 function runTier2Gates(cwd: string) {
   const scripts = packageScripts(cwd);
   const previewUrl = process.env.PREVIEW_URL ?? process.env.VERCEL_PREVIEW_URL ?? "";
-  const gates: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[]; available: boolean; requiredWhenScaffolded?: boolean }> = [
+  const gates: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[]; env?: Record<string, string>; available: boolean; requiredWhenScaffolded?: boolean }> = [
     {
       name: "e2e-preview (REQ-10.3)",
       kind: "test",
       command: "pnpm",
-      args: previewUrl && scripts["test:e2e"] ? ["test:e2e", "--base-url", previewUrl] : ["test:e2e:preview"],
+      // The preview URL rides an env var: test runners reject unknown CLI flags like
+      // --base-url, which would crash the runner and misclassify the gate as infra.
+      args: previewUrl && scripts["test:e2e"] ? ["test:e2e"] : ["test:e2e:preview"],
+      env: previewUrl ? { PREVIEW_BASE_URL: previewUrl } : undefined,
       available: Boolean((previewUrl && scripts["test:e2e"]) || scripts["test:e2e:preview"]),
     },
     { name: "longtask-pr-variant (REQ-9.3)", kind: "test", command: "pnpm", args: ["test:e2e", "-t", "longtask short"], available: Boolean(scripts["test:e2e"]) },

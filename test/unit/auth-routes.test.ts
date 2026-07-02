@@ -257,6 +257,47 @@ describe("route auth gates", () => {
     ).toHaveProperty("status", 404);
   });
 
+  it("serves the test outbox in Vercel Preview even though Next builds run with NODE_ENV=production", async () => {
+    process.env.OPERATOR_SECRET = "operator-secret";
+    process.env.E2E_TEST_ROUTES = "1";
+    process.env.VERCEL_ENV = "preview";
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    const GET = createOutboxGet({
+      buildContainer: () => ({ pool: { query: async () => ({ rows: [], rowCount: 0 }) } }) as never,
+    });
+
+    try {
+      const preview = await GET(
+        new Request("https://example.test/api/test/outbox", { headers: bearer("operator-secret") }),
+      );
+      expect(preview.status).toBe(200);
+
+      delete process.env.VERCEL_ENV;
+      const bareProduction = await GET(
+        new Request("https://example.test/api/test/outbox", { headers: bearer("operator-secret") }),
+      );
+      expect(bareProduction.status).toBe(404);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it("rejects missing and wrong cron bearer tokens on the POST handler", async () => {
+    process.env.CRON_SECRET = "cron-secret";
+    const POST = createCronPost({
+      buildContainer: () => ({ pool: { query: async () => ({ rows: [], rowCount: 0 }) } }) as never,
+      triggerSummary: async () => ({ runId: 1, claimed: true }),
+    });
+
+    expect(
+      await POST(new Request("https://example.test/api/cron/summary", { method: "POST" })),
+    ).toHaveProperty("status", 401);
+    expect(
+      await POST(new Request("https://example.test/api/cron/summary", { method: "POST", headers: bearer("wrong") })),
+    ).toHaveProperty("status", 401);
+  });
+
   it("covers direct auth helper edge cases", async () => {
     expect(tokensEqual(undefined, "secret")).toBe(false);
     expect(tokensEqual("short", "secret")).toBe(false);
