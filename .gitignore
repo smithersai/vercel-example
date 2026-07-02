@@ -1,0 +1,11 @@
+.smithers/worktrees/
+smithers.db*
+.smithers/*.db*
+*.db-shm
+*.db-wal
+node_modules/
+coverage/
+tsconfig.tsbuildinfo
+.next/
+.tmp/
+.bun-cache/
