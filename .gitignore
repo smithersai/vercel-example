@@ -9,3 +9,6 @@ tsconfig.tsbuildinfo
 .next/
 .tmp/
 .bun-cache/
+.env
+.env*.local
+run-*.log
