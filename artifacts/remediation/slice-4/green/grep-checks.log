@@ -1,0 +1,42 @@
+=== no stable INTEGRATION_BRANCH constant remains ===
+NONE FOUND (expected)
+
+=== integrationBranch(runId) function definition ===
+61:function integrationBranch(runId: string): string {
+
+=== integrationBranch(ctx.runId) usages (setup/render/land/tier2/report) ===
+274:  const res = git(["log", integrationBranch(runId), "--grep", `^smithering-land: ${ticketId}$`, "--format=%H", "-n", "1"]);
+279:  return (git(["rev-parse", integrationBranch(runId)]).stdout ?? "").trim();
+330:  const mb = git(["merge-base", ticketBranch(runId, ticketId), integrationBranch(runId)]);
+540:- Branch: ${ticketBranch(runId, ticketId)} (forked from ${integrationBranch(runId)} @ ${baseCommit}).
+599:   ${integrationBranch(runId)} (git fetch is unnecessary — same repo; use
+600:   \`git rebase ${integrationBranch(runId)}\`). If the rebase conflicts, STOP: record
+747:    const res = git(["worktree", "add", path, integrationBranch(runId)]);
+772:    return bounce(`MERGE CONFLICT landing ${branch} onto ${integrationBranch(runId)}:\n${(merge.stdout ?? "") + (merge.stderr ?? "")}\nRebase your branch onto the current integration tip, resolve, re-verify, and re-land.`);
+781:    git(["reset", "--hard", integrationBranch(runId)], iwt);
+786:    git(["reset", "--hard", integrationBranch(runId)], iwt);
+807:  git(["reset", "--hard", integrationBranch(ctx.runId)], iwt);
+910:      baseBranch={integrationBranch(runId)}
+1061:            if (git(["rev-parse", "--verify", integrationBranch(ctx.runId)]).status !== 0) {
+1063:                const create = git(["branch", integrationBranch(ctx.runId), git(["rev-parse", "--verify", "main"]).status === 0 ? "main" : "HEAD"]);
+1064:                if (create.status !== 0) throw new Error(`cannot create ${integrationBranch(ctx.runId)}: ${create.stderr}`);
+1080:                const create = git(["branch", integrationBranch(ctx.runId), sha]);
+1081:                if (create.status !== 0) throw new Error(`cannot create ${integrationBranch(ctx.runId)}: ${create.stderr}`);
+1094:              integrationBranch: integrationBranch(ctx.runId),
+1170:- Integration branch: ${integrationBranch(ctx.runId)} (git log main..${integrationBranch(ctx.runId)} — land commits
+455:function runTier2Gates(cwd: string) {
+456-  const scripts = packageScripts(cwd);
+457-  const previewUrl = process.env.PREVIEW_URL ?? process.env.VERCEL_PREVIEW_URL ?? "";
+458-  const gates: Array<{ name: string; kind: "tsc" | "test" | "other"; command: string; args: string[]; available: boolean; requiredWhenScaffolded?: boolean }> = [
+459-    {
+460-      name: "e2e-preview (REQ-10.3)",
+461-      kind: "test",
+462-      command: "pnpm",
+463-      args: previewUrl && scripts["test:e2e"] ? ["test:e2e", "--base-url", previewUrl] : ["test:e2e:preview"],
+464-      available: Boolean((previewUrl && scripts["test:e2e"]) || scripts["test:e2e:preview"]),
+465-    },
+466-    { name: "longtask-pr-variant (REQ-9.3)", kind: "test", command: "pnpm", args: ["test:e2e", "-t", "longtask short"], available: Boolean(scripts["test:e2e"]) },
+467-    { name: "smoke-skip-behavior (REQ-10.4)", kind: "test", command: "pnpm", args: ["test:e2e", "-t", "smoke"], available: Boolean(scripts["test:e2e"]) },
+468-  ];
+469-  return runGateSet(cwd, gates);
+470-}

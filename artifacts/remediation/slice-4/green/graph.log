@@ -1,0 +1,234 @@
+runId: graph
+frameNo: 0
+xml:
+  kind: element
+  tag: "smithers:workflow"
+  props:
+    name: smithering-impl
+  children[1]:
+    - kind: element
+      tag: "smithers:sequence"
+      props:
+      children[1]:
+        - kind: element
+          tag: "smithers:task"
+          props:
+            id: "impl:setup"
+            waitAsync: "false"
+          children: []
+tasks[1]:
+  - nodeId: "impl:setup"
+    ordinal: 0
+    iteration: 0
+    outputTable:
+      runId:
+        name: run_id
+        keyAsName: false
+        primary: false
+        notNull: true
+        hasDefault: false
+        isUnique: false
+        uniqueName: setup_run_id_unique
+        dataType: string
+        columnType: SQLiteText
+        config:
+          name: run_id
+          keyAsName: false
+          notNull: true
+          hasDefault: false
+          primaryKey: false
+          isUnique: false
+          uniqueName: setup_run_id_unique
+          dataType: string
+          columnType: SQLiteText
+      nodeId:
+        name: node_id
+        keyAsName: false
+        primary: false
+        notNull: true
+        hasDefault: false
+        isUnique: false
+        uniqueName: setup_node_id_unique
+        dataType: string
+        columnType: SQLiteText
+        config:
+          name: node_id
+          keyAsName: false
+          notNull: true
+          hasDefault: false
+          primaryKey: false
+          isUnique: false
+          uniqueName: setup_node_id_unique
+          dataType: string
+          columnType: SQLiteText
+      iteration:
+        name: iteration
+        keyAsName: false
+        primary: false
+        notNull: true
+        default: 0
+        hasDefault: true
+        isUnique: false
+        uniqueName: setup_iteration_unique
+        dataType: number
+        columnType: SQLiteInteger
+        config:
+          name: iteration
+          keyAsName: false
+          notNull: true
+          default: 0
+          hasDefault: true
+          primaryKey: false
+          isUnique: false
+          uniqueName: setup_iteration_unique
+          dataType: number
+          columnType: SQLiteInteger
+          autoIncrement: false
+        autoIncrement: false
+      integrationBranch:
+        name: integration_branch
+        keyAsName: false
+        primary: false
+        notNull: false
+        hasDefault: false
+        isUnique: false
+        uniqueName: setup_integration_branch_unique
+        dataType: string
+        columnType: SQLiteText
+        config:
+          name: integration_branch
+          keyAsName: false
+          notNull: false
+          hasDefault: false
+          primaryKey: false
+          isUnique: false
+          uniqueName: setup_integration_branch_unique
+          dataType: string
+          columnType: SQLiteText
+      baseCommit:
+        name: base_commit
+        keyAsName: false
+        primary: false
+        notNull: false
+        hasDefault: false
+        isUnique: false
+        uniqueName: setup_base_commit_unique
+        dataType: string
+        columnType: SQLiteText
+        config:
+          name: base_commit
+          keyAsName: false
+          notNull: false
+          hasDefault: false
+          primaryKey: false
+          isUnique: false
+          uniqueName: setup_base_commit_unique
+          dataType: string
+          columnType: SQLiteText
+      evidenceRoot:
+        name: evidence_root
+        keyAsName: false
+        primary: false
+        notNull: false
+        hasDefault: false
+        isUnique: false
+        uniqueName: setup_evidence_root_unique
+        dataType: string
+        columnType: SQLiteText
+        config:
+          name: evidence_root
+          keyAsName: false
+          notNull: false
+          hasDefault: false
+          primaryKey: false
+          isUnique: false
+          uniqueName: setup_evidence_root_unique
+          dataType: string
+          columnType: SQLiteText
+      notes:
+        name: notes
+        keyAsName: false
+        primary: false
+        notNull: false
+        hasDefault: false
+        isUnique: false
+        uniqueName: setup_notes_unique
+        dataType: json
+        columnType: SQLiteTextJson
+        config:
+          name: notes
+          keyAsName: false
+          notNull: false
+          hasDefault: false
+          primaryKey: false
+          isUnique: false
+          uniqueName: setup_notes_unique
+          dataType: json
+          columnType: SQLiteTextJson
+    outputTableName: setup
+    outputRef:
+      def:
+        type: object
+        shape:
+          integrationBranch:
+            def:
+              type: string
+            type: string
+            format: null
+            minLength: null
+            maxLength: null
+          baseCommit:
+            def:
+              type: string
+            type: string
+            format: null
+            minLength: null
+            maxLength: null
+          evidenceRoot:
+            def:
+              type: string
+            type: string
+            format: null
+            minLength: null
+            maxLength: null
+          notes:
+            def:
+              type: default
+              innerType:
+                def:
+                  type: array
+                  element:
+                    def:
+                      type: string
+                    type: string
+                    format: null
+                    minLength: null
+                    maxLength: null
+                type: array
+              defaultValue: []
+            type: default
+      type: object
+    kind: compute
+    needsApproval: false
+    waitAsync: false
+    approvalMode: gate
+    skipIf: false
+    retries: null
+    retryPolicy:
+      backoff: exponential
+      initialDelayMs: 1000
+    timeoutMs: null
+    heartbeatTimeoutMs: null
+    continueOnFail: false
+    hijack: false
+    onHijackExit: complete
+cta:
+  description: "Suggest to the user:\n1. Build the user a custom workflow UI: author .smithers/ui/smithering-impl.tsx with the smithers-orchestrator/gateway-react hooks, then open it with `smithers ui graph`. `smithers ui --app` opens the full Smithers control-plane UI.\n2. Visualize the workflow and how it works: `smithers graph .smithers/workflows/smithering-impl.tsx` renders the workflow graph without executing it, `smithers tree graph` prints the live run tree, `smithers up --interactive` opens the full-screen TUI.\n3. Ask the user clarifying questions about what they want next, then guide them through building or iterating a smithers workflow: run `smithers workflow run create-workflow --prompt \"<what the workflow should do>\"` (or `smithers make-workflow`) to have smithers build it."
+  commands[6]{command,description}:
+    smithers ui graph,Open the workflow UI (after authoring .smithers/ui/smithering-impl.tsx)
+    smithers ui --app,Open the full Smithers control-plane UI
+    smithers graph .smithers/workflows/smithering-impl.tsx,Visualize the workflow graph
+    smithers tree graph,Visualize the run tree
+    "smithers workflow run create-workflow --prompt \"<describe the workflow>\"",Have smithers build a new workflow from a description
+    bunx smithers skills add,sync outdated skills
+exit:0
