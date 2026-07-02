@@ -13,6 +13,8 @@
     "migrate": "bun run src/db/migrate.ts"
   },
   "dependencies": {
+    "@tanstack/electric-db-collection": "0.3.11",
+    "@tanstack/query-db-collection": "1.0.45",
     "next": "15.5.9",
     "pg": "^8.22.0",
     "react": "19.2.7",

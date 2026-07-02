@@ -14,7 +14,7 @@ class AtomicFakeClaimer {
 }
 
 describe("triggerSummary", () => {
-  it("invokes the executor only for the caller that claimed the run", async () => {
+  it("only enqueues the run and never executes inline", async () => {
     const invocations: number[] = [];
     const container: TriggerContainer = {
       runClaimer: new AtomicFakeClaimer(),
@@ -37,6 +37,6 @@ describe("triggerSummary", () => {
     expect(first.runId).toBe(501);
     expect(second.runId).toBe(501);
     expect([first.claimed, second.claimed].sort()).toEqual([false, true]);
-    expect(invocations).toEqual([501]);
+    expect(invocations).toEqual([]);
   });
 });

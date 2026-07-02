@@ -1,0 +1,130 @@
+$ tsc --noEmit
+../smithers/packages/gateway-client/src/index.ts(1,65): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(2,33): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(3,39): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(5,43): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(22,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(32,71): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(41,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(42,58): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(43,39): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(44,42): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(46,39): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(47,40): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(56,28): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(60,34): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(62,52): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(70,29): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/index.ts(75,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/SmithersGatewayClient.ts(2,50): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/SmithersGatewayClient.ts(3,33): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/SmithersGatewayClient.ts(7,65): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/SmithersGatewayClient.ts(8,43): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/SmithersGatewayClient.ts(19,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/SmithersGatewayConnection.ts(2,50): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/SmithersGatewayConnection.ts(3,33): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/createElectricCollection.ts(3,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/createGatewayCollection.ts(1,38): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/createGatewayCollection.ts(4,34): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/createGatewayCollection.ts(6,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/createSmithersGatewayTransport.ts(2,26): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/electricCollectionDefs.ts(2,29): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/flattenGatewayRunNode.ts(1,49): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/gatewayCollectionDefs.ts(1,38): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/gatewayCollectionDefs.ts(3,26): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/gatewayCollectionDefs.ts(12,49): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/gatewayCollectionDefs.ts(16,39): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/gatewayCollectionDefs.ts(17,65): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/gatewayCollectionDefs.ts(18,29): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/reconcileSnapshotNodes.ts(1,38): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/reconcileSnapshotNodes.ts(3,49): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-client/src/sync/snapshotToGatewayRunNode.ts(2,26): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/createGatewayReactRoot.ts(8,41): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/createGatewayReactRoot.ts(9,30): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/createGatewayReactRoot.ts(10,42): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(1,40): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(2,40): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(3,41): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(4,35): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(5,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(6,33): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(7,39): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(8,35): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(9,34): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(10,35): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(11,38): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(12,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(13,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(14,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(15,32): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(16,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(17,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(18,45): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(19,43): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(20,77): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(28,29): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(29,30): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(30,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(31,80): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(40,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(45,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(50,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(60,30): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(62,33): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(68,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(73,33): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(74,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(75,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(76,82): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/index.ts(80,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/SmithersGatewayProvider.ts(3,40): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/createGatewayCollections.ts(46,33): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/persistence/createGatewayPersistence.ts(1,43): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/persistence/createGatewayPersistence.ts(6,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/SyncProvider.ts(2,29): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayConnectionStatus.ts(2,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayMutation.ts(2,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayMutation.ts(7,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayQuery.ts(3,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayQuery.ts(4,81): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayRunStream.ts(3,69): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayRunTree.ts(4,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useGatewayRunTree.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useSyncClient.ts(2,29): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useSyncMutation.ts(3,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useSyncQuery.ts(4,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/sync/useSyncSubscription.ts(4,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayActions.ts(2,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayApprovals.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayCrons.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayExtensionAction.ts(2,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayExtensionResource.ts(2,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayExtensionStream.ts(3,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayMemoryFacts.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayNodeOutput.ts(1,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayPrompts.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayRpc.ts(4,36): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayRun.ts(4,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayRunEvents.ts(4,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayRuns.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayScores.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayTickets.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useGatewayWorkflows.ts(5,31): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway-react/src/useSmithersGateway.ts(2,40): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway/src/auth/scopes.ts(1,50): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+../smithers/packages/gateway/src/rpc/index.ts(2,38): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+app/runs/GatewayRunsDashboard.tsx(26,20): error TS2307: Cannot find module './runs.module.css' or its corresponding type declarations.
+app/runs/GatewayRunsDashboard.tsx(145,57): error TS2345: Argument of type 'Record<string, unknown>[]' is not assignable to parameter of type 'readonly Pick<GatewayRunSummaryRow, "runId" | "createdAtMs">[]'.
+  Property 'runId' is missing in type 'Record<string, unknown>' but required in type 'Pick<GatewayRunSummaryRow, "runId" | "createdAtMs">'.
+app/runs/GatewayRunsDashboard.tsx(160,57): error TS2345: Argument of type 'Record<string, unknown>[]' is not assignable to parameter of type 'readonly Pick<GatewayRunSummaryRow, "runId" | "createdAtMs">[]'.
+  Property 'runId' is missing in type 'Record<string, unknown>' but required in type 'Pick<GatewayRunSummaryRow, "runId" | "createdAtMs">'.
+app/runs/GatewayRunsDashboard.tsx(209,19): error TS2322: Type 'unknown' is not assignable to type 'Key | null | undefined'.
+app/runs/GatewayRunsDashboard.tsx(210,51): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'SetStateAction<string | undefined>'.
+app/runs/GatewayRunsDashboard.tsx(213,59): error TS2322: Type '{}' is not assignable to type 'ReactNode'.
+app/runs/GatewayRunsDashboard.tsx(214,58): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+app/runs/GatewayRunsDashboard.tsx(216,32): error TS2322: Type 'unknown' is not assignable to type 'string | undefined'.
+app/runs/GatewayRunsDashboard.tsx(217,38): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'number | undefined'.
+app/runs/GatewayRunsDashboard.tsx(228,23): error TS2322: Type 'Record<string, unknown> | undefined' is not assignable to type 'GatewayRunRow | undefined'.
+  Type 'Record<string, unknown>' is not assignable to type 'GatewayRunRow'.
+    Property 'runId' is missing in type 'Record<string, unknown>' but required in type '{ runId: string; workflowKey?: string | undefined; status?: string | undefined; createdAtMs?: number | undefined; startedAtMs?: number | undefined; finishedAtMs?: number | undefined; summary?: unknown; runState?: unknown; }'.
+error: script "typecheck" exited with code 1

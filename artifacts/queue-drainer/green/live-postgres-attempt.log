@@ -1,0 +1,24 @@
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+ ❯ test/integration/cron-live.test.ts (2 tests | 2 skipped) 10ms
+ ❯ test/integration/live-postgres.test.ts (7 tests | 7 skipped) 10ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/integration/cron-live.test.ts > scheduled cron against live postgres
+ FAIL  test/integration/live-postgres.test.ts > live postgres stack
+Error: connect EPERM ::1:5432 - Local (:::0)
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/integration/cron-live.test.ts > scheduled cron against live postgres
+ FAIL  test/integration/live-postgres.test.ts > live postgres stack
+Error: connect EPERM 127.0.0.1:5432 - Local (0.0.0.0:0)
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  9 skipped (9)
+   Start at  10:28:40
+   Duration  351ms (transform 59ms, setup 21ms, import 134ms, tests 20ms, environment 0ms)
+

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  10:29:45
+   Duration  218ms (transform 53ms, setup 18ms, import 85ms, tests 22ms, environment 0ms)
+

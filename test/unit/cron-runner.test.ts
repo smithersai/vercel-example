@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCronPost } from "@/src/routes/cron-summary";
 import type { QueryResult, Queryable } from "@/src/db/types";
+import { allowAllRateLimiter } from "@/src/rate-limit";
 
 const windowStart = new Date("2026-07-02T00:00:00.000Z");
 const windowEnd = new Date("2026-07-02T01:00:00.000Z");
@@ -30,6 +31,10 @@ function cronRequest(): Request {
   });
 }
 
+const noopDrainer = () => ({
+  drain: async () => ({ claimed: 0, executed: 0, failed: 0, deadLettered: 0 }),
+});
+
 describe("cron runner windowing", () => {
   it("keeps triggering later chats and reports a failure when one chat's execution throws", async () => {
     process.env.CRON_SECRET = "cron-secret";
@@ -39,6 +44,8 @@ describe("cron runner windowing", () => {
     ]);
     const POST = createCronPost({
       buildContainer: () => ({ pool }) as never,
+      buildDrainer: noopDrainer as never,
+      rateLimiter: allowAllRateLimiter,
       triggerSummary: async (_container, args) => {
         if (args.chatId === 10) {
           throw new Error("executor blew up");
@@ -61,6 +68,8 @@ describe("cron runner windowing", () => {
     let calls = 0;
     const POST = createCronPost({
       buildContainer: () => ({ pool }) as never,
+      buildDrainer: noopDrainer as never,
+      rateLimiter: allowAllRateLimiter,
       triggerSummary: async () => {
         calls += 1;
         return { runId: 1, claimed: true };
@@ -82,6 +91,8 @@ describe("cron runner windowing", () => {
     ]);
     const POST = createCronPost({
       buildContainer: () => ({ pool }) as never,
+      buildDrainer: noopDrainer as never,
+      rateLimiter: allowAllRateLimiter,
       triggerSummary: async (_container, args) => ({ runId: args.chatId, claimed: args.chatId === 10 }),
     });
 

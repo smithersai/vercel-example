@@ -1,0 +1,48 @@
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+ ❯ test/unit/auth-routes.test.ts (13 tests | 1 failed) 46ms
+     × rejects non-number manual trigger identifiers before DB-backed route work 4ms
+ ❯ test/unit/operator-auth-boundary.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/unit/operator-auth-boundary.test.ts [ test/unit/operator-auth-boundary.test.ts ]
+Error: Cannot find package '@/src/operator-auth' imported from /Users/williamcory/vercel-example/test/unit/operator-auth-boundary.test.ts
+ ❯ test/unit/operator-auth-boundary.test.ts:2:1
+      1| import { describe, expect, it } from "vitest";
+      2| import {
+       | ^
+      3|   OPERATOR_AUTH_COOKIE,
+      4|   cleanOperatorTokenUrl,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/unit/auth-routes.test.ts > route auth gates > rejects non-number manual trigger identifiers before DB-backed route work
+AssertionError: expected 200 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 200
+
+ ❯ test/unit/auth-routes.test.ts:269:31
+    267|         }),
+    268|       );
+    269|       expect(response.status).toBe(400);
+       |                               ^
+    270|     }
+    271|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  1 failed | 12 passed (13)
+   Start at  10:52:59
+   Duration  573ms (transform 85ms, setup 27ms, import 140ms, tests 46ms, environment 0ms)
+

@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createCronGet, createCronPost } from "@/src/routes/cron-summary";
 import { createOutboxGet } from "@/src/routes/outbox";
+import { createQueueDrainPost } from "@/src/routes/queue-drain";
 import { createTelegramWebhookPost } from "@/src/routes/telegram-webhook";
 import { createTriggerPost } from "@/src/routes/trigger";
 import { requireBearer, requireTelegramSecret, tokensEqual, unavailableSecret } from "@/src/auth";
+import { allowAllRateLimiter } from "@/src/rate-limit";
+import { kickQueueDrain, noopQueueKick } from "@/src/routes/queue-kick";
 
 const jsonHeaders = { "content-type": "application/json" };
+const noopDrainer = () => ({
+  drain: async () => ({ claimed: 0, executed: 0, failed: 0, deadLettered: 0 }),
+});
 
 function bearer(secret: string): HeadersInit {
   return { authorization: `Bearer ${secret}` };
@@ -25,6 +31,7 @@ describe("route auth gates", () => {
     let ingestCalls = 0;
     const POST = createTelegramWebhookPost({
       buildContainer: () => ({ pool: {} }) as never,
+      rateLimiter: allowAllRateLimiter,
       ingestUpdate: async () => {
         ingestCalls += 1;
         return { chatId: 42, inserted: true };
@@ -90,7 +97,9 @@ describe("route auth gates", () => {
     process.env.OPERATOR_SECRET = "operator-secret";
     let triggerCalls = 0;
     const POST = createTriggerPost({
-      buildContainer: () => ({ pool: {} }) as never,
+      buildContainer: () => ({ pool: { query: async () => ({ rows: [{ id: "42" }], rowCount: 1 }) } }) as never,
+      rateLimiter: allowAllRateLimiter,
+      kickQueue: noopQueueKick,
       triggerSummary: async () => {
         triggerCalls += 1;
         return { runId: 77, claimed: true };
@@ -139,6 +148,8 @@ describe("route auth gates", () => {
 
     const unknownChat = createTriggerPost({
       buildContainer: () => ({ pool: { query: async () => ({ rows: [], rowCount: 0 }) } }) as never,
+      rateLimiter: allowAllRateLimiter,
+      kickQueue: noopQueueKick,
       triggerSummary: async () => ({ runId: 1, claimed: true }),
     });
     const unknown = await unknownChat(
@@ -156,6 +167,8 @@ describe("route auth gates", () => {
 
     const resolvedChat = createTriggerPost({
       buildContainer: () => ({ pool: { query: async () => ({ rows: [{ id: "88" }], rowCount: 1 }) } }) as never,
+      rateLimiter: allowAllRateLimiter,
+      kickQueue: noopQueueKick,
       triggerSummary: async (_container, args) => ({ runId: args.chatId, claimed: true }),
     });
     const resolved = await resolvedChat(
@@ -171,6 +184,122 @@ describe("route auth gates", () => {
     );
     expect(resolved.status).toBe(200);
     await expect(resolved.json()).resolves.toMatchObject({ runId: 88 });
+  });
+
+  it("returns 404 for a direct chatId that does not exist, without inserting a run", async () => {
+    process.env.OPERATOR_SECRET = "operator-secret";
+    let triggerCalls = 0;
+    const unknownDirectChat = createTriggerPost({
+      buildContainer: () => ({ pool: { query: async () => ({ rows: [], rowCount: 0 }) } }) as never,
+      rateLimiter: allowAllRateLimiter,
+      kickQueue: noopQueueKick,
+      triggerSummary: async () => {
+        triggerCalls += 1;
+        return { runId: 1, claimed: true };
+      },
+    });
+
+    const response = await unknownDirectChat(
+      new Request("https://example.test/api/trigger", {
+        method: "POST",
+        headers: { ...bearer("operator-secret"), ...jsonHeaders },
+        body: JSON.stringify({
+          chatId: 424242,
+          windowStart: "2026-07-02T00:00:00.000Z",
+          windowEnd: "2026-07-02T01:00:00.000Z",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: "unknown chat" });
+    expect(triggerCalls).toBe(0);
+  });
+
+  it("rejects invalid manual trigger windows before DB-backed route work", async () => {
+    process.env.OPERATOR_SECRET = "operator-secret";
+    let buildCalls = 0;
+    let rateLimitCalls = 0;
+    let triggerCalls = 0;
+    const POST = createTriggerPost({
+      buildContainer: () => {
+        buildCalls += 1;
+        return {
+          pool: {
+            query: async () => {
+              throw new Error("DB work should not run for invalid windows");
+            },
+          },
+        } as never;
+      },
+      rateLimiter: async () => {
+        rateLimitCalls += 1;
+        return null;
+      },
+      kickQueue: noopQueueKick,
+      triggerSummary: async () => {
+        triggerCalls += 1;
+        return { runId: 1, claimed: true };
+      },
+    });
+
+    for (const body of [
+      { chatId: 42, windowStart: "not-a-date", windowEnd: "2026-07-02T01:00:00.000Z" },
+      { chatId: 42, windowStart: "2026-07-02T00:00:00.000Z", windowEnd: "2026-13-02T01:00:00.000Z" },
+      { chatId: 42, windowStart: "2026-07-02T01:00:00.000Z", windowEnd: "2026-07-02T01:00:00.000Z" },
+      { chatId: 42, windowStart: "2026-07-02T02:00:00.000Z", windowEnd: "2026-07-02T01:00:00.000Z" },
+    ]) {
+      const response = await POST(
+        new Request("https://example.test/api/trigger", {
+          method: "POST",
+          headers: { ...bearer("operator-secret"), ...jsonHeaders },
+          body: JSON.stringify(body),
+        }),
+      );
+      expect(response.status).toBe(400);
+    }
+
+    expect(buildCalls).toBe(0);
+    expect(rateLimitCalls).toBe(0);
+    expect(triggerCalls).toBe(0);
+  });
+
+  it("rejects non-number manual trigger identifiers before DB-backed route work", async () => {
+    process.env.OPERATOR_SECRET = "operator-secret";
+    let buildCalls = 0;
+    const POST = createTriggerPost({
+      buildContainer: () => {
+        buildCalls += 1;
+        return {
+          pool: {
+            query: async () => {
+              throw new Error("DB work should not run for invalid identifiers");
+            },
+          },
+        } as never;
+      },
+      rateLimiter: allowAllRateLimiter,
+      kickQueue: noopQueueKick,
+      triggerSummary: async () => ({ runId: 1, claimed: true }),
+    });
+
+    for (const body of [
+      { chatId: "42", windowStart: "2026-07-02T00:00:00.000Z", windowEnd: "2026-07-02T01:00:00.000Z" },
+      { chatId: 42.5, windowStart: "2026-07-02T00:00:00.000Z", windowEnd: "2026-07-02T01:00:00.000Z" },
+      { telegramChatId: "99", windowStart: "2026-07-02T00:00:00.000Z", windowEnd: "2026-07-02T01:00:00.000Z" },
+      { chatId: 42, telegramChatId: {}, windowStart: "2026-07-02T00:00:00.000Z", windowEnd: "2026-07-02T01:00:00.000Z" },
+    ]) {
+      const response = await POST(
+        new Request("https://example.test/api/trigger", {
+          method: "POST",
+          headers: { ...bearer("operator-secret"), ...jsonHeaders },
+          body: JSON.stringify(body),
+        }),
+      );
+      expect(response.status).toBe(400);
+    }
+
+    expect(buildCalls).toBe(0);
   });
 
   it("requires cron bearer auth for the scheduled summary route", async () => {
@@ -197,6 +326,8 @@ describe("route auth gates", () => {
             }),
           },
         }) as never,
+      buildDrainer: noopDrainer as never,
+      rateLimiter: allowAllRateLimiter,
       triggerSummary: async () => {
         cronTriggerCalls += 1;
         return { runId: cronTriggerCalls, claimed: cronTriggerCalls === 1 };
@@ -218,10 +349,103 @@ describe("route auth gates", () => {
 
     const POST = createCronPost({
       buildContainer: () => ({ pool: { query: async () => ({ rows: [], rowCount: 0 }) } }) as never,
+      buildDrainer: noopDrainer as never,
+      rateLimiter: allowAllRateLimiter,
       triggerSummary: async () => ({ runId: 1, claimed: true }),
     });
     const posted = await POST(new Request("https://example.test/api/cron/summary", { headers: bearer("cron-secret") }));
     expect(posted.status).toBe(200);
+  });
+
+  it("protects the queue drain route with cron bearer auth and runs the drainer", async () => {
+    process.env.CRON_SECRET = "cron-secret";
+    let drainCalls = 0;
+    const POST = createQueueDrainPost({
+      buildContainer: () => ({ pool: {} }) as never,
+      buildDrainer: (() => ({
+        drain: async () => {
+          drainCalls += 1;
+          return { claimed: 1, executed: 1, failed: 0, deadLettered: 0 };
+        },
+      })) as never,
+    });
+
+    expect(await POST(new Request("https://example.test/api/queue/drain", { method: "POST" }))).toHaveProperty(
+      "status",
+      401,
+    );
+
+    const accepted = await POST(
+      new Request("https://example.test/api/queue/drain", {
+        method: "POST",
+        headers: bearer("cron-secret"),
+      }),
+    );
+
+    expect(accepted.status).toBe(200);
+    await expect(accepted.json()).resolves.toMatchObject({ ok: true, claimed: 1, executed: 1 });
+    expect(drainCalls).toBe(1);
+  });
+
+  it("kicks the queue after a newly enqueued manual trigger but not after a duplicate", async () => {
+    process.env.OPERATOR_SECRET = "operator-secret";
+    let kickCalls = 0;
+    const POST = createTriggerPost({
+      buildContainer: () => ({ pool: { query: async () => ({ rows: [{ id: "1" }], rowCount: 1 }) } }) as never,
+      rateLimiter: allowAllRateLimiter,
+      kickQueue: () => {
+        kickCalls += 1;
+      },
+      triggerSummary: async (_container, args) => ({ runId: args.chatId, claimed: args.chatId === 42 }),
+    });
+    const body = (chatId: number) =>
+      JSON.stringify({
+        chatId,
+        windowStart: "2026-07-02T00:00:00.000Z",
+        windowEnd: "2026-07-02T01:00:00.000Z",
+      });
+
+    await POST(
+      new Request("https://example.test/api/trigger", {
+        method: "POST",
+        headers: { ...bearer("operator-secret"), ...jsonHeaders },
+        body: body(42),
+      }),
+    );
+    await POST(
+      new Request("https://example.test/api/trigger", {
+        method: "POST",
+        headers: { ...bearer("operator-secret"), ...jsonHeaders },
+        body: body(43),
+      }),
+    );
+
+    expect(kickCalls).toBe(1);
+  });
+
+  it("self-invokes the protected drain route when CRON_SECRET is configured", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; auth: string | null }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        auth: new Headers(init?.headers).get("authorization"),
+      });
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+
+    try {
+      kickQueueDrain(new Request("https://example.test/api/trigger"));
+      expect(calls).toHaveLength(0);
+
+      process.env.CRON_SECRET = "cron-secret";
+      kickQueueDrain(new Request("https://example.test/api/trigger"));
+      await Promise.resolve();
+
+      expect(calls).toEqual([{ url: "https://example.test/api/queue/drain", auth: "Bearer cron-secret" }]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("keeps the test outbox route gated by E2E_TEST_ROUTES, operator auth, and production", async () => {
@@ -287,6 +511,8 @@ describe("route auth gates", () => {
     process.env.CRON_SECRET = "cron-secret";
     const POST = createCronPost({
       buildContainer: () => ({ pool: { query: async () => ({ rows: [], rowCount: 0 }) } }) as never,
+      buildDrainer: noopDrainer as never,
+      rateLimiter: allowAllRateLimiter,
       triggerSummary: async () => ({ runId: 1, claimed: true }),
     });
 
@@ -310,5 +536,29 @@ describe("route auth gates", () => {
     const missingTelegram = requireTelegramSecret(new Request("https://example.test"));
     expect(missingTelegram?.status).toBe(503);
     expect(unavailableSecret("CRON_SECRET").status).toBe(503);
+  });
+
+  it("does not open the database before rejecting unauthenticated public routes", async () => {
+    const buildContainer = () => {
+      throw new Error("database should not be opened");
+    };
+    const webhook = createTelegramWebhookPost({ buildContainer: buildContainer as never });
+    const trigger = createTriggerPost({ buildContainer: buildContainer as never });
+    const cron = createCronPost({ buildContainer: buildContainer as never });
+
+    process.env.TELEGRAM_WEBHOOK_SECRET = "telegram-secret";
+    process.env.OPERATOR_SECRET = "operator-secret";
+    process.env.CRON_SECRET = "cron-secret";
+
+    await expect(webhook(new Request("https://example.test/api/telegram/webhook", { method: "POST" }))).resolves
+      .toHaveProperty("status", 401);
+    await expect(trigger(new Request("https://example.test/api/trigger", { method: "POST" }))).resolves.toHaveProperty(
+      "status",
+      401,
+    );
+    await expect(cron(new Request("https://example.test/api/cron/summary", { method: "POST" }))).resolves.toHaveProperty(
+      "status",
+      401,
+    );
   });
 });

@@ -1,0 +1,18 @@
+{
+  "summary": "Focused remediation for package dependency hygiene, executeRun retry correctness, and /api/trigger window validation.",
+  "decisions": [
+    "Restored package.json and bun.lock to the published smithers-orchestrator semver dependency (^0.26.1) instead of the local file dependency.",
+    "Removed the README TODO about waiting for gateway-react bindings because the published 0.26.1 package exports the gateway modules used by the dashboard.",
+    "Changed executeRun message selection so retries include messages already assigned to the same run while still excluding messages assigned to other runs.",
+    "Kept message reassignment limited to unassigned messages so retries do not steal messages from other runs.",
+    "Moved /api/trigger JSON window validation ahead of buildContainer, rate limiting, chat lookup, and triggerSummary so invalid dates and non-positive windows return 400 before DB-backed work."
+  ],
+  "redBeforeGreen": [
+    "bunx vitest run test/unit/pipeline-db.test.ts test/unit/auth-routes.test.ts failed before the fix with the retry SQL missing assigned_run_id = $4 and invalid trigger windows returning 200 instead of 400.",
+    "The same focused command passed after the implementation changes with 35 tests passing."
+  ],
+  "environmentBlockers": [
+    "Could not create a task branch or commit because .git is read-only in the sandbox; git switch -c production-readiness-remediation failed with Operation not permitted.",
+    "TEST_DATABASE_URL was unset, so live Postgres integration cases were skipped; bun run test:integration completed with 1 passed file and 2 skipped files."
+  ]
+}

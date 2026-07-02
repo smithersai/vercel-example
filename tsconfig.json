@@ -34,6 +34,7 @@
   "include": [
     "app/**/*.ts",
     "app/**/*.tsx",
+    "middleware.ts",
     "src/**/*.ts",
     "test/**/*.ts",
     "vitest.config.ts",

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createTelegramWebhookPost } from "@/src/routes/telegram-webhook";
 import { createTriggerPost } from "@/src/routes/trigger";
+import { allowAllRateLimiter } from "@/src/rate-limit";
+import { noopQueueKick } from "@/src/routes/queue-kick";
 
 describe("route smoke e2e", () => {
   it("accepts an authenticated webhook and authenticated manual trigger through route handlers", async () => {
@@ -9,10 +11,13 @@ describe("route smoke e2e", () => {
 
     const webhook = createTelegramWebhookPost({
       buildContainer: () => ({ pool: {} }) as never,
+      rateLimiter: allowAllRateLimiter,
       ingestUpdate: async () => ({ chatId: 42, inserted: true }),
     });
     const trigger = createTriggerPost({
-      buildContainer: () => ({ pool: {} }) as never,
+      buildContainer: () => ({ pool: { query: async () => ({ rows: [{ id: "42" }], rowCount: 1 }) } }) as never,
+      rateLimiter: allowAllRateLimiter,
+      kickQueue: noopQueueKick,
       triggerSummary: async () => ({ runId: 7, claimed: true }),
     });
 
