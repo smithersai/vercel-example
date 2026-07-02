@@ -1,0 +1,28 @@
+$ vitest run test/unit
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+ ❯ test/unit/runs-dashboard.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/unit/runs-dashboard.test.ts [ test/unit/runs-dashboard.test.ts ]
+Error: Cannot find package 'smithers-orchestrator/gateway-client' imported from /Users/williamcory/vercel-example/app/runs/GatewayRunsDashboard.tsx
+ ❯ app/runs/GatewayRunsDashboard.tsx:16:1
+     14|   useGatewayRuns,
+     15| } from "smithers-orchestrator/gateway-react";
+     16| import {
+       | ^
+     17|   SmithersGatewayClient,
+     18|   createSmithersGatewayTransport,
+ ❯ test/unit/runs-dashboard.test.ts:4:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  39 passed (39)
+   Start at  10:27:03
+   Duration  1.13s (transform 153ms, setup 54ms, import 337ms, tests 75ms, environment 0ms)
+
+error: script "test:unit" exited with code 1

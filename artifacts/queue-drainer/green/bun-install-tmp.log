@@ -1,0 +1,2 @@
+bun install v1.3.14 (0d9b296a)
+error: bun is unable to write files to tempdir: PermissionDenied

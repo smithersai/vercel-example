@@ -1,0 +1,18 @@
+$ next build
+   ▲ Next.js 15.5.9
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 3.8s
+   Linting and checking validity of types ...
+Failed to compile.
+
+../smithers/packages/gateway-client/src/index.ts:1:65
+Type error: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m { gatewayBackoffDelay[33m,[39m type [33mGatewayBackoffOptions[39m } [36mfrom[39m [32m"./gatewayBackoffDelay.ts"[39m[33m;[39m
+ [90m   |[39m                                                                 [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m { [33mGatewayRpcError[39m } [36mfrom[39m [32m"./GatewayRpcError.ts"[39m[33m;[39m
+ [90m 3 |[39m [36mexport[39m { [33mSmithersGatewayClient[39m } [36mfrom[39m [32m"./SmithersGatewayClient.ts"[39m[33m;[39m
+ [90m 4 |[39m [36mexport[39m type { [33mGatewayStreamReconnectEvent[39m } [36mfrom[39m [32m"./SmithersGatewayClient.ts"[39m[33m;[39m[0m
+Next.js build worker exited with code: 1 and signal: null
+error: script "build" exited with code 1

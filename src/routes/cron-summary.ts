@@ -1,6 +1,8 @@
 import { requireBearer } from "@/src/auth";
-import { buildContainer as defaultBuildContainer } from "@/src/container";
+import { buildContainer as defaultBuildContainer, type Container } from "@/src/container";
 import { triggerSummary as defaultTriggerSummary } from "@/src/pipeline";
+import { buildQueueDrainer, type QueueDrainResult } from "@/src/queue-drainer";
+import { defaultRateLimiter, type RouteRateLimiter } from "@/src/rate-limit";
 
 interface CronChatRow {
   chat_id: string;
@@ -11,14 +13,15 @@ interface CronChatRow {
 interface CronDeps {
   buildContainer?: typeof defaultBuildContainer;
   triggerSummary?: typeof defaultTriggerSummary;
+  buildDrainer?: typeof buildQueueDrainer;
+  rateLimiter?: RouteRateLimiter;
 }
 
 function createCronRunner({
-  buildContainer = defaultBuildContainer,
   triggerSummary = defaultTriggerSummary,
+  buildDrainer = buildQueueDrainer,
 }: CronDeps = {}) {
-  return async function runCron(): Promise<Response> {
-    const container = buildContainer();
+  return async function runCron(container: Container): Promise<Response> {
     // Window bounds must be deterministic, not per-request now(): every tick inside the
     // same hour computes the identical (chat, window_start, window_end) claim key, so the
     // UNIQUE run constraint dedupes concurrent and repeated scheduler invocations.
@@ -58,14 +61,14 @@ function createCronRunner({
           );
         }
       } catch {
-        // executeRun already marked the run failed; keep the cursor where it is so the
-        // next tick retries this chat's window (widened to the new hour boundary), and
-        // keep going so one bad chat cannot starve the rest.
+        // Keep going so one bad chat cannot starve the rest. Once a run row exists,
+        // retries are owned by the queue drainer rather than by the scheduler cursor.
         failed += 1;
       }
     }
 
-    return Response.json({ ok: true, triggered, failed });
+    const drain: QueueDrainResult = await buildDrainer(container).drain();
+    return Response.json({ ok: true, triggered, failed, drain });
   };
 }
 
@@ -76,7 +79,16 @@ export function createCronGet(deps: CronDeps = {}) {
     if (authError) {
       return authError;
     }
-    return runCron();
+    const container = (deps.buildContainer ?? defaultBuildContainer)();
+    const rateLimitError = await (deps.rateLimiter ?? defaultRateLimiter)({
+      pool: container.pool,
+      request,
+      scope: "cron:summary",
+    });
+    if (rateLimitError) {
+      return rateLimitError;
+    }
+    return runCron(container);
   };
 }
 
@@ -87,6 +99,15 @@ export function createCronPost(deps: CronDeps = {}) {
     if (authError) {
       return authError;
     }
-    return runCron();
+    const container = (deps.buildContainer ?? defaultBuildContainer)();
+    const rateLimitError = await (deps.rateLimiter ?? defaultRateLimiter)({
+      pool: container.pool,
+      request,
+      scope: "cron:summary",
+    });
+    if (rateLimitError) {
+      return rateLimitError;
+    }
+    return runCron(container);
   };
 }

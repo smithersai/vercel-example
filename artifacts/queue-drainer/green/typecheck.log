@@ -1,0 +1,8 @@
+$ tsc --noEmit
+app/runs/GatewayRunsDashboard.tsx(15,8): error TS2307: Cannot find module 'smithers-orchestrator/gateway-react' or its corresponding type declarations.
+app/runs/GatewayRunsDashboard.tsx(25,8): error TS2307: Cannot find module 'smithers-orchestrator/gateway-client' or its corresponding type declarations.
+app/runs/GatewayRunsDashboard.tsx(26,20): error TS2307: Cannot find module './runs.module.css' or its corresponding type declarations.
+app/runs/GatewayRunsDashboard.tsx(113,16): error TS7017: Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.
+app/runs/GatewayRunsDashboard.tsx(206,28): error TS7006: Parameter 'item' implicitly has an 'any' type.
+app/runs/GatewayRunsDashboard.tsx(237,42): error TS7006: Parameter 'approval' implicitly has an 'any' type.
+app/runs/GatewayRunsDashboard.tsx(361,31): error TS7006: Parameter 'child' implicitly has an 'any' type.

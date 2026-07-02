@@ -68,7 +68,7 @@ on environment.
 
 | Port | Methods | Real impl | Test impl |
 |---|---|---|---|
-| `TelegramPort` | `sendMessage`, `editMessageText`, `sendChatAction`, `setWebhook`, `getMe`, `getWebhookInfo` | raw typed HTTP client with D27 retry | **Postgres-backed fake** writing to `telegram_outbox` (E3) |
+| `TelegramPort` | `sendMessage` | app adapter over `smithers-orchestrator/telegram`'s typed Bot API helper with D27 retry | **Postgres-backed fake** writing to `telegram_outbox` (E3) |
 | `SummarizerPort` | `summarize(input: SummaryInput): SummarySchema` | Anthropic Messages API (`claude-sonnet-5`) | **fixture store** replaying recorded, schema-validated outputs (E4) |
 | `Clock/Invoker` | `now()`, `invokeExecutor(runId)` | system clock / Sandbox invocation | controllable clock / inline invocation for local e2e |
 

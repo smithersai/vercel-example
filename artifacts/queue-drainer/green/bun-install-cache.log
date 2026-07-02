@@ -1,0 +1,9 @@
+bun install v1.3.14 (0d9b296a)
+error: Package "smithers-orchestrator" is not linked
+
+To install a linked package:
+   bun link my-pkg-name-from-package-json
+
+Tip: the package name is from package.json, which can differ from the folder name.
+
+error: smithers-orchestrator@link:/Users/williamcory/smithers/packages/smithers failed to resolve

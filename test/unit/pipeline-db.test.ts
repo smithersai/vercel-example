@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildContainer, SystemClock } from "@/src/container";
 import { getPool, closePool } from "@/src/db/pool";
-import { PostgresRunClaimer } from "@/src/db/run-store";
+import { PostgresRunClaimer, PostgresRunQueueStore } from "@/src/db/run-store";
 import type { QueryResult, Queryable } from "@/src/db/types";
 import { ingestUpdate } from "@/src/ingest";
 import { executeRun, type ClaimRunArgs } from "@/src/pipeline";
+import { QueueDrainer } from "@/src/queue-drainer";
+import { defaultRateLimiter, enforcePostgresRateLimit, policyForScope } from "@/src/rate-limit";
 import { renderSummary } from "@/src/render";
 import { FixtureSummarizerPort } from "@/src/summary";
 import { FakeTelegramPort } from "@/src/telegram";
@@ -62,6 +64,137 @@ describe("PostgresRunClaimer", () => {
       error = caught;
     }
     expect(String(error)).toContain("run claim conflict");
+  });
+});
+
+describe("PostgresRunQueueStore", () => {
+  it("claims runnable runs with row locks and a visibility lease", async () => {
+    const leaseExpiresAt = new Date("2026-07-02T00:15:00.000Z");
+    const pool = new ScriptedPool([
+      {
+        rows: [
+          {
+            id: "301",
+            attempt_count: 1,
+            lease_owner: "00000000-0000-4000-8000-000000000001",
+            lease_expires_at: leaseExpiresAt,
+          },
+        ],
+        rowCount: 1,
+      },
+    ]);
+
+    await expect(
+      new PostgresRunQueueStore(pool).claimRunnableRuns({
+        limit: 2,
+        leaseSeconds: 30,
+        maxAttempts: 4,
+        leaseOwner: "00000000-0000-4000-8000-000000000001",
+      }),
+    ).resolves.toEqual([
+      {
+        runId: 301,
+        attemptCount: 1,
+        leaseOwner: "00000000-0000-4000-8000-000000000001",
+        leaseExpiresAt,
+      },
+    ]);
+
+    expect(pool.calls[0].text).toContain("FOR UPDATE SKIP LOCKED");
+    expect(pool.calls[0].text).toContain("lease_expires_at");
+    expect(pool.calls[0].params).toEqual([2, "00000000-0000-4000-8000-000000000001", 30, 4]);
+  });
+
+  it("marks failures with backoff and then dead-letters after max attempts", async () => {
+    const nextAttemptAt = new Date("2026-07-02T00:01:00.000Z");
+    const pool = new ScriptedPool([
+      { rows: [{ status: "failed", attempt_count: 2, next_attempt_at: nextAttemptAt }], rowCount: 1 },
+      { rows: [{ status: "dead_lettered", attempt_count: 3, next_attempt_at: null }], rowCount: 1 },
+    ]);
+    const store = new PostgresRunQueueStore(pool);
+
+    await expect(
+      store.markRunFailed({
+        runId: 301,
+        leaseOwner: "00000000-0000-4000-8000-000000000001",
+        error: new Error("temporary"),
+        maxAttempts: 3,
+        backoffBaseSeconds: 10,
+        backoffMaxSeconds: 60,
+      }),
+    ).resolves.toEqual({ status: "failed", attemptCount: 2, nextAttemptAt });
+    await expect(
+      store.markRunFailed({
+        runId: 301,
+        leaseOwner: "00000000-0000-4000-8000-000000000001",
+        error: "permanent",
+        maxAttempts: 3,
+      }),
+    ).resolves.toEqual({ status: "dead_lettered", attemptCount: 3, nextAttemptAt: null });
+
+    expect(pool.calls[0].text).toContain("next_attempt_at");
+    expect(pool.calls[0].text).toContain("'dead_lettered'");
+    expect(pool.calls[1].params?.[2]).toBe("permanent");
+  });
+
+  it("returns null when a failure mark no longer owns the lease", async () => {
+    const pool = new ScriptedPool([{ rows: [], rowCount: 0 }]);
+
+    await expect(
+      new PostgresRunQueueStore(pool).markRunFailed({
+        runId: 301,
+        leaseOwner: "00000000-0000-4000-8000-000000000001",
+        error: new Error("lost lease"),
+      }),
+    ).resolves.toBeNull();
+  });
+});
+
+describe("QueueDrainer", () => {
+  it("claims, executes, and marks retryable and dead-letter failures", async () => {
+    const failures: Array<{ runId: number; error: unknown }> = [];
+    const drainer = new QueueDrainer({
+      createLeaseOwner: () => "00000000-0000-4000-8000-000000000010",
+      store: {
+        claimRunnableRuns: async ({ leaseOwner }) => [
+          {
+            runId: 1,
+            attemptCount: 0,
+            leaseOwner,
+            leaseExpiresAt: new Date("2026-07-02T00:15:00.000Z"),
+          },
+          {
+            runId: 2,
+            attemptCount: 1,
+            leaseOwner,
+            leaseExpiresAt: new Date("2026-07-02T00:15:00.000Z"),
+          },
+          {
+            runId: 3,
+            attemptCount: 2,
+            leaseOwner,
+            leaseExpiresAt: new Date("2026-07-02T00:15:00.000Z"),
+          },
+        ],
+        markRunFailed: async ({ runId, error }) => {
+          failures.push({ runId, error });
+          return { status: runId === 3 ? "dead_lettered" : "failed" };
+        },
+      },
+      executeRun: async (runId) => {
+        if (runId !== 1) {
+          throw new Error(`run ${runId} failed`);
+        }
+      },
+    });
+
+    await expect(drainer.drain({ limit: 3, maxAttempts: 3 })).resolves.toEqual({
+      claimed: 3,
+      executed: 1,
+      failed: 1,
+      deadLettered: 1,
+    });
+    expect(failures.map((failure) => failure.runId)).toEqual([2, 3]);
   });
 });
 
@@ -220,6 +353,7 @@ describe("executeRun", () => {
       },
       { rows: [], rowCount: 2 },
       { rows: [], rowCount: 1 },
+      { rows: [{ chunk_text: "Summary for 2026-07-02T00:00:00.000Z\n\n- ship\n- verify" }], rowCount: 1 },
       { rows: [], rowCount: 1 },
       { rows: [], rowCount: 1 },
     ]);
@@ -241,10 +375,10 @@ describe("executeRun", () => {
 
     expect(sentTexts[0]).toContain("- ship");
     expect(sentTexts[0]).toContain("- verify");
-    expect(pool.calls).toHaveLength(7);
+    expect(pool.calls).toHaveLength(8);
   });
 
-  it("marks the run failed with the error and rethrows when execution blows up mid-run", async () => {
+  it("rethrows when execution blows up mid-run so the drainer can mark retry state", async () => {
     const pool = new ScriptedPool([
       {
         rows: [
@@ -260,7 +394,6 @@ describe("executeRun", () => {
       { rows: [], rowCount: 1 },
       { rows: [], rowCount: 0 },
       { rows: [], rowCount: 0 },
-      { rows: [], rowCount: 1 },
     ]);
 
     await expect(
@@ -277,15 +410,92 @@ describe("executeRun", () => {
         902,
       ),
     ).rejects.toThrow("summarizer unavailable");
-
-    const failureMark = pool.calls[4];
-    expect(failureMark.text).toContain("'failed'");
-    expect(failureMark.text).toContain("attempt_count");
-    expect(failureMark.params?.[0]).toBe(902);
-    expect(String(failureMark.params?.[1])).toContain("summarizer unavailable");
+    expect(pool.calls).toHaveLength(4);
   });
 
-  it("still surfaces the original error when the failure mark itself cannot be written", async () => {
+  it("includes messages already assigned to the same run when retrying after a failed attempt", async () => {
+    const calls: Array<{ text: string; params?: readonly unknown[] }> = [];
+    let insertedSummary = "";
+    const sentTexts: string[] = [];
+    const pool: Queryable = {
+      async query<T = unknown>(text: string, params?: readonly unknown[]): Promise<QueryResult<T>> {
+        calls.push({ text, params });
+        if (text.includes("SELECT chat_id, window_start, window_end, status FROM run")) {
+          return {
+            rows: [
+              {
+                chat_id: "42",
+                window_start: new Date("2026-07-02T00:00:00.000Z"),
+                window_end: new Date("2026-07-02T01:00:00.000Z"),
+                status: "failed",
+              } as T,
+            ],
+            rowCount: 1,
+          };
+        }
+        if (text.includes("UPDATE run SET status = 'running'")) {
+          return { rows: [], rowCount: 1 };
+        }
+        if (text.includes("SELECT from_user, text, sent_at")) {
+          const includesSameRunMessages = text.includes("assigned_run_id = $4") && params?.[3] === 904;
+          return {
+            rows: includesSameRunMessages
+              ? ([
+                  { from_user: "alice", text: "retry survives", sent_at: new Date("2026-07-02T00:10:00.000Z") },
+                  { from_user: "bob", text: "new message", sent_at: new Date("2026-07-02T00:11:00.000Z") },
+                ] as T[])
+              : [],
+            rowCount: includesSameRunMessages ? 2 : 0,
+          };
+        }
+        if (text.includes("UPDATE message SET assigned_run_id")) {
+          return { rows: [], rowCount: 1 };
+        }
+        if (text.includes("INSERT INTO run_chunk")) {
+          insertedSummary = String(params?.[1]);
+          return { rows: [], rowCount: 1 };
+        }
+        if (text.includes("UPDATE run_chunk") && text.includes("RETURNING chunk_text")) {
+          return { rows: [{ chunk_text: insertedSummary } as T], rowCount: 1 };
+        }
+        if (text.includes("UPDATE run_chunk SET state = 'sent'")) {
+          return { rows: [], rowCount: 1 };
+        }
+        if (text.includes("UPDATE run") && text.includes("summary_text")) {
+          return { rows: [], rowCount: 1 };
+        }
+        throw new Error(`unexpected query: ${text}`);
+      },
+    };
+
+    await executeRun(
+      {
+        pool,
+        telegram: {
+          async sendMessage({ text }) {
+            sentTexts.push(text);
+            return { messageId: 904 };
+          },
+        },
+        summarizer: new FixtureSummarizerPort(),
+      },
+      904,
+    );
+
+    const messageSelect = calls.find((call) => call.text.includes("SELECT from_user, text, sent_at"));
+    expect(messageSelect?.text).toContain("assigned_run_id IS NULL");
+    expect(messageSelect?.text).toContain("assigned_run_id = $4");
+    expect(messageSelect?.params).toEqual([
+      42,
+      new Date("2026-07-02T00:00:00.000Z"),
+      new Date("2026-07-02T01:00:00.000Z"),
+      904,
+    ]);
+    expect(sentTexts[0]).toContain("- retry survives");
+    expect(sentTexts[0]).toContain("- new message");
+  });
+
+  it("returns without sending if another executor already reserved the run chunk", async () => {
     const pool = new ScriptedPool([
       {
         rows: [
@@ -301,23 +511,71 @@ describe("executeRun", () => {
       { rows: [], rowCount: 1 },
       { rows: [], rowCount: 0 },
       { rows: [], rowCount: 0 },
-      new Error("database gone"),
+      { rows: [], rowCount: 1 },
+      { rows: [], rowCount: 0 },
     ]);
+    let sends = 0;
 
-    await expect(
-      executeRun(
-        {
-          pool,
-          telegram: { sendMessage: async () => ({ messageId: 1 }) },
-          summarizer: {
-            summarize: async () => {
-              throw new Error("summarizer unavailable");
-            },
+    await executeRun(
+      {
+        pool,
+        telegram: {
+          sendMessage: async () => {
+            sends += 1;
+            return { messageId: 1 };
           },
         },
-        903,
-      ),
-    ).rejects.toThrow("summarizer unavailable");
+        summarizer: new FixtureSummarizerPort(),
+      },
+      903,
+    );
+
+    expect(sends).toBe(0);
+  });
+});
+
+describe("rate limiting", () => {
+  it("increments a fixed Postgres window and returns 429 over the limit", async () => {
+    const resetAt = new Date(Date.now() + 60_000);
+    const pool = new ScriptedPool([
+      { rows: [{ count: 1, reset_at: resetAt }], rowCount: 1 },
+      { rows: [{ count: 2, reset_at: resetAt }], rowCount: 1 },
+    ]);
+    const request = new Request("https://example.test/api/trigger", {
+      headers: { "x-forwarded-for": "203.0.113.10, 198.51.100.1" },
+    });
+    const policy = { scope: "operator:trigger" as const, limit: 1, windowSeconds: 60 };
+
+    await expect(enforcePostgresRateLimit(pool, request, policy)).resolves.toBeNull();
+    const rejected = await enforcePostgresRateLimit(pool, request, policy);
+
+    expect(rejected?.status).toBe(429);
+    expect(rejected?.headers.get("x-ratelimit-limit")).toBe("1");
+    expect(pool.calls[0].params).toEqual(["operator:trigger", "203.0.113.10", 60]);
+  });
+
+  it("falls back to documented defaults for invalid rate-limit env values", () => {
+    process.env.RATE_LIMIT_WINDOW_SECONDS = "nope";
+    process.env.RATE_LIMIT_TRIGGER_MAX = "-1";
+
+    expect(policyForScope("operator:trigger")).toEqual({
+      scope: "operator:trigger",
+      limit: 20,
+      windowSeconds: 60,
+    });
+  });
+
+  it("uses the default route limiter policy for a scope", async () => {
+    const pool = new ScriptedPool([{ rows: [{ count: 1, reset_at: new Date(Date.now() + 60_000) }], rowCount: 1 }]);
+
+    await expect(
+      defaultRateLimiter({
+        pool,
+        request: new Request("https://example.test/api/cron/summary"),
+        scope: "cron:summary",
+      }),
+    ).resolves.toBeNull();
+    expect(pool.calls[0].params?.[0]).toBe("cron:summary");
   });
 });
 
@@ -339,7 +597,7 @@ describe("container and pool wiring", () => {
     expect(new SystemClock().now()).toBeInstanceOf(Date);
   });
 
-  it("wires a default inline invoker when no invoker override is supplied", async () => {
+  it("wires a default no-op invoker because execution is owned by the queue drainer", async () => {
     const pool = new ScriptedPool([{ rows: [], rowCount: 0 }]);
     const container = buildContainer({
       pool,
@@ -349,13 +607,8 @@ describe("container and pool wiring", () => {
       clock: { now: () => new Date("2026-07-02T00:00:00.000Z") },
     });
 
-    let error: unknown;
-    try {
-      await container.invoker.invokeExecutor(1);
-    } catch (caught) {
-      error = caught;
-    }
-    expect(String(error)).toContain("run 1 not found");
+    await expect(container.invoker.invokeExecutor(1)).resolves.toBeUndefined();
+    expect(pool.calls).toHaveLength(0);
   });
 
   it("fails fast when DATABASE_URL is missing, and can close an unopened pg pool", async () => {

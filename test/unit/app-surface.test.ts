@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, expect, it } from "vitest";
 import { GET as cronGet, POST as cronPost } from "@/app/api/cron/summary/route";
+import { POST as queueDrainPost } from "@/app/api/queue/drain/route";
 import { POST as webhookPost } from "@/app/api/telegram/webhook/route";
 import { GET as outboxGet } from "@/app/api/test/outbox/route";
 import { POST as triggerPost } from "@/app/api/trigger/route";
@@ -9,7 +10,7 @@ import Page from "@/app/page";
 
 describe("app deployable surface", () => {
   it("exposes route handlers wired to the authed factories", async () => {
-    for (const handler of [cronGet, cronPost, webhookPost, outboxGet, triggerPost]) {
+    for (const handler of [cronGet, cronPost, queueDrainPost, webhookPost, outboxGet, triggerPost]) {
       expect(handler).toBeTypeOf("function");
     }
 
@@ -17,6 +18,8 @@ describe("app deployable surface", () => {
     // proving the app/ exports run the same auth gates as the factories they re-export.
     const cron = await cronGet(new Request("https://example.test/api/cron/summary"));
     expect(cron.status).toBe(503);
+    const drain = await queueDrainPost(new Request("https://example.test/api/queue/drain", { method: "POST" }));
+    expect(drain.status).toBe(503);
     const webhook = await webhookPost(
       new Request("https://example.test/api/telegram/webhook", { method: "POST", body: "{}" }),
     );
