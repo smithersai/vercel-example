@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TelegramMessageResult, TelegramSendMessageArgs } from "smithers-orchestrator/telegram";
-import { TelegramBotApiPort } from "@/src/telegram";
+import { TelegramBotApiPort, type TelegramBotApiPortOptions } from "@/src/telegram";
 
 describe("TelegramBotApiPort helper delegation", () => {
   it("uses the smithers-orchestrator Telegram client for real Bot API delivery", async () => {
@@ -11,7 +11,9 @@ describe("TelegramBotApiPort helper delegation", () => {
     const sendMessage = vi.fn(async (args: TelegramSendMessageArgs): Promise<TelegramMessageResult> => {
       return { message_id: 321, chat: { id: args.chatId }, text: args.text };
     });
-    const createClient = vi.fn(() => ({ sendMessage }));
+    const createClient = vi.fn(() => ({ sendMessage })) as unknown as NonNullable<
+      TelegramBotApiPortOptions["createClient"]
+    >;
 
     const port = new TelegramBotApiPort({
       botToken: "123:abc",
