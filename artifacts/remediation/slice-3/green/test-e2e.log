@@ -1,0 +1,10 @@
+$ vitest run test/e2e
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  04:46:55
+   Duration  140ms (transform 31ms, setup 12ms, import 53ms, tests 11ms, environment 0ms)
+

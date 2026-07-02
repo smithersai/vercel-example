@@ -1,0 +1,17 @@
+$ tsc --noEmit
+.next/types/app/api/cron/summary/route.ts(12,13): error TS2344: Type 'OmitWithTag<typeof import("/Users/williamcory/vercel-example/app/api/cron/summary/route"), "POST" | "config" | "generateStaticParams" | "revalidate" | "dynamic" | "dynamicParams" | "fetchCache" | ... 8 more ... | "PATCH", "">' does not satisfy the constraint '{ [x: string]: never; }'.
+  Property 'createCronGet' is incompatible with index signature.
+    Type '(deps?: CronDeps) => (request: Request) => Promise<Response>' is not assignable to type 'never'.
+.next/types/app/api/telegram/webhook/route.ts(12,13): error TS2344: Type 'OmitWithTag<typeof import("/Users/williamcory/vercel-example/app/api/telegram/webhook/route"), "POST" | "config" | "generateStaticParams" | "revalidate" | "dynamic" | "dynamicParams" | ... 9 more ... | "PATCH", "">' does not satisfy the constraint '{ [x: string]: never; }'.
+  Property 'createTelegramWebhookPost' is incompatible with index signature.
+    Type '({ buildContainer, ingestUpdate, }?: WebhookDeps) => (request: Request) => Promise<Response>' is not assignable to type 'never'.
+.next/types/app/api/test/outbox/route.ts(12,13): error TS2344: Type 'OmitWithTag<typeof import("/Users/williamcory/vercel-example/app/api/test/outbox/route"), "POST" | "config" | "generateStaticParams" | "revalidate" | "dynamic" | "dynamicParams" | "fetchCache" | ... 8 more ... | "PATCH", "">' does not satisfy the constraint '{ [x: string]: never; }'.
+  Property 'createOutboxGet' is incompatible with index signature.
+    Type '({ buildContainer }?: OutboxDeps) => (request: Request) => Promise<Response>' is not assignable to type 'never'.
+.next/types/app/api/trigger/route.ts(12,13): error TS2344: Type 'OmitWithTag<typeof import("/Users/williamcory/vercel-example/app/api/trigger/route"), "POST" | "config" | "generateStaticParams" | "revalidate" | "dynamic" | "dynamicParams" | "fetchCache" | ... 8 more ... | "PATCH", "">' does not satisfy the constraint '{ [x: string]: never; }'.
+  Property 'createTriggerPost' is incompatible with index signature.
+    Type '({ buildContainer, triggerSummary, }?: TriggerDeps) => (request: Request) => Promise<Response>' is not assignable to type 'never'.
+.next/types/app/layout.ts(34,31): error TS2344: Type '{ children: unknown; }' does not satisfy the constraint 'LayoutProps'.
+  Types of property 'children' are incompatible.
+    Type 'unknown' is not assignable to type 'ReactNode'.
+app/layout.tsx(4,13): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.

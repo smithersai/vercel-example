@@ -1,0 +1,14 @@
+$ next build
+   ▲ Next.js 15.5.9
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 1603ms
+   Linting and checking validity of types ...
+Failed to compile.
+
+app/api/cron/summary/route.ts
+Type error: Route "app/api/cron/summary/route.ts" does not match the required types of a Next.js Route.
+  "createCronGet" is not a valid Route export field.
+
+Next.js build worker exited with code: 1 and signal: null
+error: script "build" exited with code 1
