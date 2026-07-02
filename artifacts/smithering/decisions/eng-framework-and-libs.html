@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Decision: framework and library picks</title>
+<style>body{font:15px/1.55 -apple-system,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}pre{background:#f5f5f5;padding:.8rem;overflow:auto;border-radius:6px}
+table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.35rem .6rem;text-align:left;vertical-align:top}
+.win{background:#eaf7ea}.note{color:#666;font-size:.9em}</style></head><body>
+<h1>Decision: Next.js app, thin Telegram client, croner, Vitest+Playwright, structured LLM output</h1>
+<p class="note">2026-07-01 · docs/planning/03-eng.md §2 · resolves the "open" items from eng-deps §7</p>
+
+<h2>What was decided (and the alternative each beat)</h2>
+<table>
+<tr><th>Pick</th><th>Beat</th><th>Why</th></tr>
+<tr class="win"><td><b>Next.js on Vercel</b> (routes + operator UI in one app)</td><td>Separate SPA + bare Functions</td><td>AC-7.6 wants UI in the same deployment; one framework = one coverage config, one deploy, template stays copyable.</td></tr>
+<tr class="win"><td><b>Thin Telegram client</b> (raw fetch behind the 3-method C5 interface)</td><td>telegraf / full grammY framework</td><td>D26/D27's retry+ledger idempotency must be ours; a framework's built-in retry/session machinery would fight the Postgres-driven model. Matches eng-deps §5 recommendation.</td></tr>
+<tr class="win"><td><b>croner</b> for D4's cron walk</td><td>cron-parser</td><td>Native TypeScript + built-in IANA tz handling; DST correctness gated by blocking probe A5, and it's swappable behind C6's one-function interface if the probe fails.</td></tr>
+<tr class="win"><td><b>Vitest (v8 coverage) + Playwright</b></td><td>Jest / Cypress / node:test</td><td>Vitest branch coverage is the 100% gate mechanism (AC-10.1); Playwright runs one e2e suite against both localhost and Preview URLs (AC-10.2/10.3) — the "same suite, two targets" requirement is its core strength.</td></tr>
+<tr class="win"><td><b>LLM returns structured JSON; MarkdownV2 rendered by our deterministic code</b> (claude-sonnet-5)</td><td>LLM emits final MarkdownV2 directly</td><td>Escaping/chunking become 100%-coverable pure functions (AC-3.4, D8) and groundedness eval (AC-3.3) checks structured fields, not prose. LLM-emitted markup would make the coverage gate depend on live LLM calls.</td></tr>
+</table>
+
+<h2>Example input/output of the structured-output boundary</h2>
+<pre>LLM output (schema-validated JSON):
+{ "topics":[{"title":"DB migration","synthesis":"Move to Postgres agreed",
+  "participants":["Alice","Bob"]}],
+  "decisions":["Adopt Postgres"], "actionItems":[{"item":"Draft schema","owner":"Bob"}],
+  "links":[{"url":"https://neon.tech","context":"hosting candidate"}] }
+
+Deterministic renderer output (MarkdownV2, escaped, chunked by D8):
+📋 *Summary* — 14:00 to 15:00 \(UTC\)
+
+*Topics*
+• DB migration: Move to Postgres agreed — Alice, Bob
+...</pre>
+
+<p class="note">All picks behind narrow interfaces (C5/C6/C8) so a failed probe swaps a
+library, not the architecture.</p>
+</body></html>

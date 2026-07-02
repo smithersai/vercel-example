@@ -1,0 +1,7 @@
+{
+  "assumptionId": "A7",
+  "blocked": true,
+  "reason": "ANTHROPIC_API_KEY not set in this environment; cannot call the real Anthropic Messages API to measure schema-pass rate. No data fabricated.",
+  "fixtureCount": 10,
+  "results": []
+}

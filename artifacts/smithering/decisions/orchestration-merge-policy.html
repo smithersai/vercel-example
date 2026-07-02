@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision: merge policy — serialized lane, no optimistic eviction</title>
+<style>body{font:16px/1.5 system-ui;max-width:60rem;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:2rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:.4rem .6rem;text-align:left;vertical-align:top}code,pre{background:#f4f4f4;border-radius:4px}pre{padding:.8rem;overflow-x:auto}.win{background:#eafaea}.lose{background:#faf0f0}.note{background:#fff8e1;padding:.6rem .8rem;border-left:4px solid #e0b400}</style></head><body>
+<h1>O2 — Merge policy: serialized merge lane; optimistic merging with postsubmit eviction is NOT built</h1>
+<p><b>Context:</b> 06-orchestration.md O2 · 2026-07-01 · vercel-example implementation run (23 tickets, dep graph in <code>artifacts/smithering/tickets.json</code>).</p>
+
+<h2>Decision</h2>
+<p>Work lands through a <b>single serialized merge lane</b>: Smithers <code>MergeQueue</code> used purely as a concurrency limiter with limit 1. Per ticket: rebase onto <code>main</code> → rerun the full Tier-1 gate set on the rebased tree → fast-forward/squash into <code>main</code> → release slot. <code>main</code> is never red by construction.</p>
+
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>What it needs</th><th>Verdict</th></tr>
+<tr class="win"><td><b>Serialized lane (chosen)</b></td><td>MergeQueue(limit=1) — exists today. Rebase+retest is worker logic already required.</td><td>Zero new infrastructure; correctness by construction.</td></tr>
+<tr class="lose"><td>Optimistic merge + postsubmit eviction</td><td>Custom CheckSuite wiring + Saga compensation + <code>jj revert</code> eviction logic — none of this exists in Smithers; MergeQueue is <b>only</b> a concurrency limiter, it does not evict.</td><td>Rejected: negative ROI (see math), adds a bad-eviction failure class to a repo whose product is correctness gates.</td></tr>
+<tr class="lose"><td>Queue limit 2 with post-land re-run</td><td>Small config change.</td><td>Held as the recorded escalation if the lane measurably stalls; not the default.</td></tr>
+</table>
+
+<h2>Example throughput math (why optimistic loses here)</h2>
+<pre>Tier-1 gate set (fixture LLM, fake Telegram, local PG): ~5–10 min per ticket.
+Workers: 3 (O5). Worst case all 3 finish simultaneously:
+  serialized lane latency = 2 × 10 min of queueing per day-ish event.
+Optimistic eviction saves that ~20 min but costs:
+  eviction saga build+test (days), and every eviction rewrites main history
+  mid-run while other worktrees auto-rebase — including PAST FAILED rebases
+  (known smithers worktree resume behavior), i.e. silent breakage risk.</pre>
+
+<div class="note"><b>Load-bearing fact:</b> smithers worktree runs auto-rebase on resume <i>even if the rebase failed</i>. Optimistic merging multiplies rebase events; serialization minimizes them. The O1 resume protocol (worker must run <code>jj st</code>/conflict check as step zero) is the belt for the residual.</div>
+
+<h2>Consequences</h2>
+<ul>
+<li>Landing is O(1) tickets at a time; development stays parallel (3 worktrees).</li>
+<li>A Tier-1 failure in the lane returns the ticket to its worker with the output — no revert ever needed on <code>main</code>.</li>
+<li>Tier-2 (Preview e2e, post-land) failures halt dispatch and open a fix ticket; they do not trigger reverts either unless the human orders one.</li>
+</ul>
+</body></html>

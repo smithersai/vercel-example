@@ -1,0 +1,134 @@
+{
+  "assumption": "A8: 10 chunks at 1/s to one chat avoid unrecoverable 429s under D27 backoff",
+  "telegramCallsMade": 10,
+  "chunksSent": 10,
+  "chunksDelivered": 10,
+  "chunksFailed": 0,
+  "total429sObserved": 0,
+  "maxAttemptsUsedForAnyChunk": 1,
+  "maxAttemptsAllowed": 5,
+  "durationMs": 9016,
+  "passed": true,
+  "perChunk": [
+    {
+      "chunkIndex": 0,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 1
+        }
+      ]
+    },
+    {
+      "chunkIndex": 1,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 2
+        }
+      ]
+    },
+    {
+      "chunkIndex": 2,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 3
+        }
+      ]
+    },
+    {
+      "chunkIndex": 3,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 4
+        }
+      ]
+    },
+    {
+      "chunkIndex": 4,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 5
+        }
+      ]
+    },
+    {
+      "chunkIndex": 5,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 6
+        }
+      ]
+    },
+    {
+      "chunkIndex": 6,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 7
+        }
+      ]
+    },
+    {
+      "chunkIndex": 7,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 8
+        }
+      ]
+    },
+    {
+      "chunkIndex": 8,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 9
+        }
+      ]
+    },
+    {
+      "chunkIndex": 9,
+      "success": true,
+      "attempts": 1,
+      "log": [
+        {
+          "attempt": 1,
+          "outcome": "sent",
+          "messageId": 10
+        }
+      ]
+    }
+  ]
+}

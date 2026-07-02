@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision: Durable test adapters for Preview e2e (E3/E4)</title>
+<style>body{font:16px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}code,pre{background:#f4f4f4;border-radius:4px;padding:2px 5px}pre{padding:12px;overflow-x:auto}h1{font-size:1.5rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px 10px;text-align:left}.win{background:#e8f5e9}</style></head><body>
+<h1>E3/E4 — Postgres-backed Telegram fake + fixture-mode Summarizer</h1>
+<p><b>Context.</b> AC-10.2/10.3 require the <i>same</i> e2e suite green locally and against each PR's Vercel Preview. In Preview, webhook/tick/executor/UI run in separate isolates — the v1 in-memory Telegram fake's state is invisible across them. And C8's Anthropic dependency would make every PR lane paid, flaky, and non-deterministic.</p>
+<h2>Decision E3 — fake TelegramPort writes to Postgres</h2>
+<p>The fake adapter records every call (<code>method, chat_id, payload, generated message_id</code>) in a <code>telegram_outbox</code> table in the same per-Preview Neon branch (D29). The e2e suite asserts via a test-only authed route <code>/api/test/outbox</code> (enabled by <code>E2E_TEST_ROUTES=1</code>, D18 bearer secret, excluded from production builds). Identical assertion surface locally.</p>
+<h2>Decision E4 — SummarizerPort with fixture default</h2>
+<p><code>SUMMARIZER_MODE=fixture</code> (default in all PR lanes) replays recorded outputs keyed by a hash of the canonicalized input; missing fixture = loud failure. <code>anthropic</code> mode (real API + schema validation + one repair retry) runs in a nightly/opt-in live-eval lane, mirroring the D30 Telegram smoke pattern. Both modes validate against the same <code>SummarySchema</code>, so shape bugs fail identically. Fixtures recorded via <code>pnpm fixtures:record</code> and reviewed in PRs.</p>
+<h2>Alternatives</h2>
+<table>
+<tr class="win"><td><b>Postgres outbox + fixture LLM (chosen)</b></td><td>Durable across isolates; branch-isolated per PR for free; zero new infra; deterministic, secret-free PR lanes.</td></tr>
+<tr><td>In-memory fake (v1)</td><td>State lost across Preview isolates — the review's objection; suite could never pass in Preview.</td></tr>
+<tr><td>Separate mock-Telegram HTTP service</td><td>A second deployment to operate; violates the "nothing to operate" template spirit and complicates Preview wiring.</td></tr>
+<tr><td>Live Anthropic in every PR lane</td><td>Non-deterministic, paid, secret-dependent; blocks fork PRs; AC-3.2 assertions flake.</td></tr>
+<tr><td>Assert only via UI/DB (no delivery surface)</td><td>Cannot verify chunk order/content/protocol steps — exactly what AC-5.1/5.3 tests need to observe.</td></tr>
+</table>
+<h2>Example e2e assertion (same code, both environments)</h2>
+<pre>await seedMessages(chat, fixture.messages)
+await post('/api/cron/tick')                 // claim + execute
+const out = await get('/api/test/outbox?chat=' + chat.id)
+expect(out.filter(m =&gt; m.method === 'editMessageText')
+          .map(m =&gt; m.payload.text).join(''))
+  .toEqual(expectedSummaryChunks.join(''))   // exactly once, in order</pre>
+</body></html>

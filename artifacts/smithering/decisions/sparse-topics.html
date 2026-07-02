@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision E13 — Sparse-window summary shape</title>
+<style>body{font:15px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}pre{background:#f6f8fa;padding:.8rem;border-radius:6px;font-size:13px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem;text-align:left}.rej{color:#8a5a00}.pick{color:#0a6b2d;font-weight:600}</style></head><body>
+<h1>E13 — topics[1–7], honest short form for sparse windows (eng doc §8.1, v3)</h1>
+<p><b>Context.</b> Review (major finding 4): D7/SummarySchema enforced topics[3–7], but AC-4.3 requires a threshold-1 chat to get a summary for a <em>one-message</em> window. Forcing 3 topics there means fabrication (violates AC-3.3).</p>
+<p><b>Decision.</b> <code>SummarySchema.topics</code> is <b>1–7</b>; the renderer emits however many real topics exist. REQ-3's "3–7 main topics" is read as the normal-window upper shape, not a floor forcing invention. Recorded as design errata D7′ against the design doc's template.</p>
+<pre>Window with 1 message ("Bob: standup moved to 10am"):
+📋 *Summary* — 09:00 to 10:00 (UTC)
+*Topics*
+• Standup rescheduled to 10am — Bob
+(Decisions/Action items/Links omitted per D7)</pre>
+<table>
+<tr><th>Alternative</th><th>Verdict</th><th>Why</th></tr>
+<tr><td>Keep 3–7, pad with invented topics</td><td class="rej">Rejected</td><td>Direct AC-3.3 violation; the grounding eval would (correctly) fail it.</td></tr>
+<tr><td>Skip sparse windows even at threshold 1</td><td class="rej">Rejected</td><td>Directly contradicts AC-4.3's explicit threshold-1 requirement.</td></tr>
+<tr><td>Separate "mini-summary" template</td><td class="rej">Rejected</td><td>Second template = second rendering/chunking/test surface; the D7 template already contracts gracefully by omitting empty sections.</td></tr>
+<tr><td class="pick">topics[1–7], same template</td><td class="pick">Chosen</td><td>One schema, one renderer, no fabrication; testable with 1- and 2-topic fixtures.</td></tr>
+</table>
+</body></html>

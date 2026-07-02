@@ -1,0 +1,10 @@
+$ vitest run test/integration
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  04:32:38
+   Duration  127ms (transform 35ms, setup 14ms, import 31ms, tests 4ms, environment 0ms)
+

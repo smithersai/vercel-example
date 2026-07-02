@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+
+ Test Files  5 passed (5)
+      Tests  21 passed (21)
+   Start at  04:32:30
+   Duration  672ms (transform 66ms, setup 37ms, import 208ms, tests 44ms, environment 0ms)
+

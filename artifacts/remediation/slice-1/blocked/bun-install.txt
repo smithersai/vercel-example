@@ -1,0 +1,14 @@
+bun install v1.3.14 (0d9b296a)
+Resolving dependencies
+Resolved, downloaded and extracted [24]
+error: FailedToOpenSocket downloading package manifest react-dom
+
+error: ConnectionRefused downloading package manifest typescript
+
+error: FailedToOpenSocket downloading package manifest react
+
+error: ConnectionRefused downloading package manifest next
+error: typescript@6.0.3 failed to resolve
+error: next@15.5.4 failed to resolve
+error: react@19.2.7 failed to resolve
+error: react-dom@19.2.7 failed to resolve

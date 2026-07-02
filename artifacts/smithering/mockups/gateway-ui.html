@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summary Bot — Gateway UI (mockup, mock data)</title>
+<style>
+  :root{--bg:#0f1115;--panel:#171a21;--line:#262b36;--txt:#e6e9ef;--dim:#9aa3b2;--acc:#5b8def;--ok:#3fb27f;--warn:#d9a23c;--err:#d95c5c}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt)}
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;margin:0}
+  header .env{margin-left:auto;color:var(--dim);font-size:12px}
+  main{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;padding:16px 20px;max-width:1200px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px}
+  .done{background:#153526;color:var(--ok)} .skip{background:#33301a;color:var(--warn)}
+  .fail{background:#3a1e1e;color:var(--err)} .run{background:#1b2a4a;color:var(--acc)}
+  button{background:var(--acc);border:0;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  input,select{background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:13px}
+  .detail{margin-top:16px;grid-column:1/-1}
+  .msg{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap;font-size:13px;color:var(--txt)}
+  .muted{color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 Summary Bot — Gateway</h1>
+  <span class="env">production · db: neon-main · 🔒 authenticated</span>
+</header>
+<main>
+  <section>
+    <h2>Runs</h2>
+    <table>
+      <tr><th>Run</th><th>Chat</th><th>Window (UTC)</th><th>Status</th><th></th></tr>
+      <tr><td>#412</td><td>Design Team</td><td>Jun 30 09:00 → Jul 1 09:00</td><td><span class="pill run">running</span></td><td class="muted">agent: summarizing…</td></tr>
+      <tr><td>#411</td><td>Design Team</td><td>Jun 29 09:00 → Jun 30 09:00</td><td><span class="pill done">posted</span></td><td><button class="ghost">view</button></td></tr>
+      <tr><td>#410</td><td>Weekend Hikers</td><td>Jun 23 → Jun 30 (weekly)</td><td><span class="pill skip">skipped</span></td><td class="muted">2 msgs &lt; threshold 3</td></tr>
+      <tr><td>#409</td><td>Eng Standup</td><td>Jun 29 17:00 → Jun 30 17:00</td><td><span class="pill fail">failed</span></td><td><button>retry</button></td></tr>
+      <tr><td>#408</td><td>Eng Standup</td><td>manual · Jun 28 12:00 → 18:00</td><td><span class="pill done">posted</span></td><td><button class="ghost">view</button></td></tr>
+    </table>
+    <div class="row">
+      <span class="muted">Summarize now:</span>
+      <select><option>Design Team</option><option>Eng Standup</option><option>Weekend Hikers</option></select>
+      <input type="datetime-local" value="2026-07-01T00:00">
+      <span class="muted">→</span>
+      <input type="datetime-local" value="2026-07-01T12:00">
+      <button>▶ Summarize now</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Chats</h2>
+    <table>
+      <tr><th>Chat</th><th>Cron</th><th>TZ</th><th>Min</th><th>State</th></tr>
+      <tr><td>Design Team</td><td><code>0 9 * * *</code></td><td>UTC</td><td>3</td><td><button class="ghost">pause</button></td></tr>
+      <tr><td>Eng Standup</td><td><code>0 17 * * 1-5</code></td><td>America/New_York</td><td>1</td><td><button class="ghost">pause</button></td></tr>
+      <tr><td>Weekend Hikers</td><td><code>0 8 * * 1</code></td><td>Europe/Berlin</td><td>3</td><td><button class="ghost">edit</button></td></tr>
+      <tr><td class="muted">Old Project (paused)</td><td class="muted"><code>0 9 * * *</code></td><td class="muted">UTC</td><td class="muted">3</td><td><button class="ghost">enable</button></td></tr>
+    </table>
+    <div class="row"><button>＋ Add chat</button></div>
+  </section>
+
+  <section class="detail">
+    <h2>Run #411 — Design Team · posted Jun 30 09:00:41 UTC · 2 chunks · 6m12s</h2>
+    <div class="msg">📋 Chat summary — Mon Jun 29 09:00 → Tue Jun 30 09:00 (UTC)
+
+Topics
+1. Release planning — @maria and @deniz agreed to cut v2.1 Thursday; @sam flagged flaky e2e as a blocker.
+2. Onboarding doc rewrite — @lee shared a draft; feedback from @maria.
+3. Offsite logistics — venues discussed, no conclusion.
+
+Decisions
+• Cut release v2.1 on Thursday.
+
+Action items
+• @sam: fix or quarantine flaky e2e tests before Thursday.
+• @lee: incorporate onboarding feedback by Friday.
+
+Links
+• https://example.com/docs/onboarding-v2</div>
+    <div class="row"><button class="ghost">replay</button><span class="muted">142 messages in window · threshold 3 · model: execution=sonnet, review=fable</span></div>
+  </section>
+</main>
+</body>
+</html>

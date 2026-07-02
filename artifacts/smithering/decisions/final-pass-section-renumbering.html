@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decision: renumber sections contiguously, keep decision IDs stable</title>
+<style>
+body{font:15px/1.5 -apple-system,Segoe UI,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}
+table{border-collapse:collapse;margin:.6rem 0}
+td,th{border:1px solid #ddd;padding:.3rem .7rem;text-align:left}
+th{background:#f4f4f5}
+.alt{border:1px solid #ddd;border-radius:6px;padding:.6rem .9rem;margin:.6rem 0}
+.alt b{display:block}
+.chosen{border-color:#2e7d32;background:#f2f8f2}
+small{color:#666}
+</style>
+</head>
+<body>
+<h1>Renumber sections contiguously (draft §3.5–3.7, §7.5 → final §4–6, §11); decision IDs untouched</h1>
+<p><small>Final design pass, 2026-07-01 · docs/planning/02-design.md · orchestrator judgment call</small></p>
+
+<h2>What was decided</h2>
+<p>The draft accreted review-driven sections as fractional numbers (§3.5, §3.6, §3.7,
+§7.5) so v1 section references stayed valid during review. The final doc is the durable
+artifact implementers read, so sections are renumbered into a contiguous 1–14 sequence.
+Decision IDs (D1–D31) are the stable cross-reference currency and are <b>not</b>
+renumbered; the doc header states the mapping.</p>
+
+<h2>Mapping</h2>
+<table>
+<tr><th>Draft</th><th>Final</th><th>Topic</th></tr>
+<tr><td>§3.5</td><td>§4</td><td>Execution architecture (D21–D23)</td></tr>
+<tr><td>§3.6</td><td>§5</td><td>Missed-window catch-up (D25)</td></tr>
+<tr><td>§3.7</td><td>§6</td><td>Delivery retry / idempotency (D26–D27)</td></tr>
+<tr><td>§4–§6</td><td>§7–§9</td><td>Formatting, skip behavior, operator UI</td></tr>
+<tr><td>§7</td><td>§10</td><td>README/onboarding</td></tr>
+<tr><td>§7.5</td><td>§11</td><td>Test/coverage architecture (D28–D31)</td></tr>
+<tr><td>§8–§9</td><td>§13–§14</td><td>Open questions; gaps (§12 is the new Decisions index)</td></tr>
+</table>
+
+<h2>Alternatives considered</h2>
+<div class="alt"><b>A. Keep fractional numbering in the final doc</b>
+Zero-diff and preserves draft section references, but a finished doc opening with
+"§3.5" signals patchwork and makes the execution architecture — the core of the design —
+look like an afterthought bolted onto §3. Rejected for a document meant to be a flagship
+example.</div>
+<div class="alt chosen"><b>B. Contiguous renumber + explicit mapping in the header (chosen)</b>
+Readers of the final doc get a clean structure; anyone tracing a draft-era reference has
+the mapping in the header and, more importantly, decision IDs — the unit review comments
+actually cite — are unchanged.</div>
+
+<h2>Example</h2>
+<p>Draft cross-reference "see §7.5 (coverage)" becomes "§11" in the final doc; a review
+comment saying "D29 needs seeded data" still resolves to the same per-Preview-database
+decision in both documents.</p>
+</body>
+</html>

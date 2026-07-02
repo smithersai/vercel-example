@@ -1,0 +1,302 @@
+{
+  "version": "v1 (2026-07-01)",
+  "upstream": [
+    "docs/planning/01-prd.md",
+    "docs/planning/02-design.md",
+    "docs/planning/03-eng.md",
+    "docs/planning/04-backpressure.md"
+  ],
+  "notes": "Ticket 1 is the walking skeleton / smoke slice. Human gates: A13 (AC-5.3 amendment) blocks exactly-once-chunk-delivery; A2 live re-run gates sandbox-async-executor-invocation; A1/A11 live-bot probes gate live-telegram-smoke-lane assertions. Vercel Pro plan is a hard deployment prerequisite (A3 falsified on Hobby).",
+  "tickets": [
+    {
+      "id": "walking-skeleton-summary-slice",
+      "title": "Walking skeleton: webhook → manual summarize → fixture summary → fake-Telegram outbox, end to end",
+      "instructions": "Create the minimal end-to-end slice that every later ticket builds on; it doubles as the permanent smoke test. Scaffold a Next.js (App Router) TypeScript app at the repo root with Vitest and a local Postgres (docker-compose or `pg` against DATABASE_URL). Create migrations for the eng-doc §4 (docs/planning/03-eng.md) core tables: chat, chat_config, message (with UNIQUE(chat_id, telegram_message_id) and is_bot), run (with UNIQUE(chat_id, window_start, window_end), status/trigger CHECKs), run_chunk, telegram_outbox. Implement the three ports from eng §1 with TEST implementations only for now: TelegramPort as the Postgres-backed fake writing to telegram_outbox (E3), SummarizerPort in fixture mode (a hardcoded schema-valid fixture is fine for this ticket; the real fixture store is ticket summarizer-fixture-and-live-lanes), and a controllable Clock/Invoker (inline invocation). Implement: POST /api/telegram/webhook (accepts a Telegram update JSON, upserts chat, inserts message idempotently via ON CONFLICT DO NOTHING — AC-1.4); a manual-trigger endpoint that claims a run row for a given chat+window via INSERT ... ON CONFLICT DO NOTHING (D2) and executes the pipeline inline: fetch messages, summarize via fixture, render with the window header (AC-3.1), write chunks to run_chunk, 'send' via the fake TelegramPort, finalize status='posted'. Add /api/test/outbox (gated by E2E_TEST_ROUTES=1) for assertions. Write one e2e test `walking skeleton`: deliver 3 webhook updates, trigger a summary over a window covering them, assert exactly one summary in telegram_outbox naming the window and containing message content, and that re-delivering a duplicate update produced no duplicate content. Also add the deferred-cleanup step from PRD non-goals: delete the dev scaffolding smithers.db* files from the deploy path (they must not ship). Conventions: pnpm scripts test:unit / test:integration / test:e2e; app source under src/; ports under src/ports/.",
+      "requirementIds": ["AC-1.1", "AC-1.4", "AC-3.1", "AC-8.2"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"walking skeleton\" green locally: webhook-ingested messages appear in exactly one outbox summary naming its window; duplicate update delivery does not duplicate content" },
+        { "kind": "command", "details": "pnpm test:integration -t \"webhook dedup\" — deliver same update 3×, assert one message row (REQ-1.4 gate from docs/planning/04-backpressure.md)" },
+        { "kind": "agent-review", "details": "Review that all run-lifecycle state is durable Postgres rows (no in-memory/in-invocation state), the schema matches eng §4 including CHECK constraints and unique keys, and application logic never branches on environment (ports are constructor-injected)" }
+      ],
+      "dependsOn": [],
+      "complexity": "large"
+    },
+    {
+      "id": "ci-coverage-and-secret-gates",
+      "title": "CI quality gates: 100% coverage, gitleaks, env-docs check, docs markers lint",
+      "instructions": "Wire the repo-quality gates from PRD REQ-10/REQ-11 and backpressure rows REQ-10.1/11.2/11.3. (1) Vitest v8 coverage with hard thresholds 100/100 line+branch on app source (`vitest run --coverage`); create a reviewed exclusion file (e.g. coverage-exclusions.ts or vitest config `coverage.exclude`) that is small, explicit, and commented — anything not listed counts. Prove the gate can fail: commit a red run with an intentionally uncovered SQL-fence early-exit branch (probe A9 pattern, see artifacts/smithering/probes/A9/), then cover it (BP-5 red-before-green evidence). (2) gitleaks secret scan over full git history as a CI job. (3) `pnpm check:env-docs`: a script asserting the README env-var table is a superset of every process.env key referenced in src/. (4) `pnpm test:unit -t \"docs markers\"`: docs-lint asserting README/user-guide contain anchor markers for the pre-install-history limitation and quiet-window-skip sections (AC-11.2) — add placeholder-anchored sections now; ticket template-readme-and-fresh-eyes fills them in. Set these up as GitHub Actions required PR checks.",
+      "requirementIds": ["AC-10.1", "AC-11.2", "AC-11.3"],
+      "verification": [
+        { "kind": "command", "details": "vitest run --coverage exits non-zero when a fence branch is intentionally uncovered (linked red run), and green at 100/100 after" },
+        { "kind": "command", "details": "gitleaks detect over full history clean; pnpm check:env-docs green; pnpm test:unit -t \"docs markers\" green" },
+        { "kind": "agent-review", "details": "Review the coverage exclusion list: every entry is framework boilerplate/generated code with a written justification; nothing that contains logic is excluded" }
+      ],
+      "dependsOn": ["walking-skeleton-summary-slice"],
+      "complexity": "small"
+    },
+    {
+      "id": "summarizer-fixture-and-live-lanes",
+      "title": "SummarizerPort: fixture/replay lane, live Anthropic lane, SummarySchema, fixtures:record",
+      "instructions": "Implement E4 + E13 (docs/planning/03-eng.md §14.3, §8.1). Define SummarySchema (JSON Schema): window {start,end}, topics[1–7] with participants (1–7 per E13 amendment, NOT D7's 3–7), decisions[], actionItems[], links[]. Both implementations validate output against it before it reaches the renderer. SUMMARIZER_MODE=fixture (default in dev/PR/Preview): replay recorded outputs from fixtures/summaries/ keyed by a stable hash of the canonicalized SummaryInput; unknown key → loud failure naming the missing fixture; fixtures schema-validated on load. SUMMARIZER_MODE=anthropic: Anthropic Messages API with model claude-sonnet-5, structured output validated against SummarySchema with exactly one repair retry. NOTE (A7, unverified — probe blocked on missing ANTHROPIC_API_KEY): the ≥95% first-try schema-pass-rate is unproven; when a key is available, run artifacts/smithering/probes/A7/probe.mjs to record firstTryPassRate/postRepairPassRate, and reuse its harness for `pnpm fixtures:record` (regenerates fixtures via the real API, reviewed in PR). Author the 10 fixture conversations (topics/decision/action-item/link plants, emoji/code/non-Latin variants, a single-message sparse fixture, a 2-topic fixture). Renderer: sparse windows contract honestly per E13 — 1–2 topic lines, optional sections omitted, nothing invented.",
+      "requirementIds": ["AC-3.2", "AC-3.3", "AC-4.3", "engineering-only"],
+      "verification": [
+        { "kind": "command", "details": "pnpm test:e2e -t \"structured summary\" — fixture with topics/decision/action/link yields all sections with attribution, schema-validated (REQ-3.2 gate)" },
+        { "kind": "command", "details": "Unit tests: unknown fixture key fails loudly naming the key; sparse one-message fixture renders a schema-valid one-topic summary; 2-topic fixture renders exactly 2" },
+        { "kind": "agent-review", "details": "Review fixture conversations for realism and that planted facts (participants, decision, action item, link) are unambiguous enough that their absence from a summary is a real failure, not fixture ambiguity" }
+      ],
+      "dependsOn": ["walking-skeleton-summary-slice"],
+      "complexity": "medium"
+    },
+    {
+      "id": "telegram-http-client-retries",
+      "title": "Real TelegramPort: raw typed HTTP client with bounded retry/backoff + fault-injecting test decorator",
+      "instructions": "Implement the real TelegramPort (eng §1 ports table): a raw typed HTTP client (no framework — frameworks' retry machinery conflicts with the delivery ledger) covering sendMessage, editMessageText, sendChatAction, setWebhook, getMe, getWebhookInfo. Retry policy per D27 (docs/planning/02-design.md): bounded exponential backoff honoring Telegram 429 retry_after, retrying 5xx/timeouts, never retrying 4xx (except 429). MarkdownV2 escaping utilities live here or in the renderer — coordinate with exactly-once-chunk-delivery which owns the chunker. Also build the FaultInjectingTelegramPort decorator (test builds only, eng §14.2): reads a fault plan from the test DB (kill-after-ack-of-send-#k, 429-with-retry_after, timeout-after-ack) so crash-cut tests run in-process locally AND against Preview; add the test-only fault-plan routes gated by E2E_TEST_ROUTES=1 + bearer secret. Write the transient-retry integration test: fault plan of 429 retry_after then 5xx then timeout; assert the summary eventually posts with zero manual intervention (REQ-5.2 gate).",
+      "requirementIds": ["AC-5.2", "engineering-only"],
+      "verification": [
+        { "kind": "command", "details": "pnpm test:integration -t \"transient retry\" — FaultInjectingTelegramPort 429/5xx/timeout plans end with status='posted', no manual steps (REQ-5.2 gate)" },
+        { "kind": "command", "details": "Unit tests: backoff schedule respects retry_after; 400-class errors are not retried; typed request/response shapes round-trip" },
+        { "kind": "agent-review", "details": "Review that no retry path can double-send outside the ledger protocol (the client retries only idempotent-safe operations pre-ack; post-ack ambiguity is left to the E1 ledger, not retried blindly)" }
+      ],
+      "dependsOn": ["walking-skeleton-summary-slice"],
+      "complexity": "medium"
+    },
+    {
+      "id": "smithers-postgres-runtime",
+      "title": "Summarize pipeline as a smithers workflow on the Postgres state driver, resumable across processes",
+      "instructions": "Implement E10.1/E10.2 (docs/planning/03-eng.md §2). Author the summarize pipeline (assign → threshold → budget → summarize → chunk → deliver → finalize) as a smithers workflow whose step boundaries are the durability boundaries. Use the async openSmithersBackend/createSmithersPostgres factory — createSmithers is SQLite-only (probe A12 finding, see artifacts/smithering/probes/A12/README.md and workflow.tsx for working reference code). Smithers state lives in a dedicated `smithers` schema in the SAME Postgres database as the app schema (AC-8.2); add run.smithers_run_id as the join key. Executor entrypoint: acquire the app-level lease (from ticket run-lease-heartbeat-watchdog if landed; otherwise a temporary claim), run the smithers runtime in-process for that one run to completion or step failure, exit — no resident daemon. Resume: re-invoking the entrypoint for the same run.id resumes the same smithers run and does NOT re-execute completed steps; decide and record (in code comments + docs) whether re-invocation waits out RUN_HEARTBEAT_STALE_MS or always resumes with --force via claimRunForResume CAS (A12 operational note 8). Ensure no stray legacy smithers.db sits next to the Postgres-configured deployment (SMITHERS_MIGRATION_REQUIRED hard-fails). Graduate the A12 spike into a permanent e2e: kill the executor mid-workflow (after step 2 of the pipeline), re-invoke, assert only remaining steps execute (step-execution-count assertions) — this is the REQ-8.1 kill/resume gate. If any smithers gap surfaces, fix it upstream in /Users/williamcory/smithers (code+tests+docs) per the standing directive, not with a local workaround.",
+      "requirementIds": ["AC-8.1", "AC-8.2", "AC-9.1"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"kill/resume\" — kill executor mid-workflow, re-invoke, run completes with completed steps not re-executed (REQ-8.1 gate; RBG vs no-persistence logic)" },
+        { "kind": "command", "details": "pnpm test:e2e -t \"single store\" — point a fresh app instance at the existing DB; runs, configs, messages AND smithers step history restored; build-scan asserts no *.db/sqlite artifact (REQ-8.2 gate)" },
+        { "kind": "agent-review", "details": "Review that step boundaries match the idempotent steps of eng D23/§5, that the app run table remains the sole claim/idempotency surface, and that the resume-vs-force decision is recorded with rationale" }
+      ],
+      "dependsOn": ["walking-skeleton-summary-slice"],
+      "complexity": "large"
+    },
+    {
+      "id": "run-lease-heartbeat-watchdog",
+      "title": "Run attempts: lease + heartbeat + fencing token; watchdog re-invoke and attempt exhaustion",
+      "instructions": "Implement E2 (docs/planning/03-eng.md §6) on the run table columns already migrated (lease_owner uuid, lease_expires_at, heartbeat_at, attempt_count, last_error). Acquire: the exact atomic UPDATE from §6 (lease free or expired, status pending/running, attempt_count+1, RETURNING; zero rows → exit). Heartbeat: every 30s extend lease_expires_at/heartbeat_at, fenced; failed heartbeat = lease lost → abort immediately. Lease TTL 5 min, decoupled from task duration (a healthy 40-min task heartbeats ~80×). Watchdog (runs inside /api/cron/tick, coordinate with scheduled-cron-window-lineage): re-invoke executor for runs WHERE status='running' AND lease_expires_at < now() AND attempt_count < 5; at max_attempts, fenced-finalize status='failed', failure_reason=last_error (AC-5.4), and the next window still claims. Fencing everywhere: lease_owner is the token guarding EVERY durable executor write. Tests (all named in eng §6, all must be able to fail): lease mutual-exclusion property test under concurrent acquire against real Postgres; simulated crash → single new attempt → correct final state; slow-but-alive task never taken over; attempt exhaustion → failed with reason and subsequent window unaffected.",
+      "requirementIds": ["AC-5.4", "AC-8.1", "AC-9.4"],
+      "verification": [
+        { "kind": "command", "details": "pnpm test:integration -t \"attempt exhaustion\" — max_attempts → status='failed' with failure_reason; next window's run still claims and posts (REQ-5.4 gate)" },
+        { "kind": "command", "details": "Lease mutual-exclusion property test: N concurrent acquires against real Postgres never yield two live leases; slow-but-alive heartbeating task is never taken over" },
+        { "kind": "agent-review", "details": "Review every durable write in the executor path for the fencing predicate (lease_owner match) — enumerate the writes and confirm none is unfenced" }
+      ],
+      "dependsOn": ["walking-skeleton-summary-slice"],
+      "complexity": "medium"
+    },
+    {
+      "id": "scheduled-cron-window-lineage",
+      "title": "Cron tick: sched_cursor window lineage, croner DST walking, ingest grace, atomic claims",
+      "instructions": "Implement /api/cron/tick due-scan per E14 + E9-grace + D4 (docs/planning/03-eng.md §6.1, §7). Auth: Authorization Bearer CRON_SECRET (E11). Scheduled windows derive ONLY from chat_config.sched_cursor (initialized to enabled_at; := enabled_at again on re-enable, AC-6.2): walk the 5-field cron forward with croner in the chat's IANA timezone (UTC default), and for each elapsed boundary b where now() >= b + INGEST_GRACE (default 120s), claim window [sched_cursor, b) via INSERT ... ON CONFLICT DO NOTHING on run(chat_id, window_start, window_end); whether claimed or conflicted (e.g. an exact-match manual run already covered it), advance sched_cursor := b in the same transaction. Manual runs never touch sched_cursor; overlapping (non-exact) manual windows get an overlap badge flag on both runs. Config validation: invalid cron rejected at config-write time with a clear error, transactionally — no partial chat_config row (AC-2.3). Missed boundaries (platform outage, A3 finding: Vercel gives no firing SLA even on Pro) are caught up oldest-first on the next tick — this catch-up walk is load-bearing correctness, add an explicit missed-tick e2e (AC-2.5, §19 amendment 2). Tests: E14 property test over random scheduled×manual interleavings asserting the scheduled lineage is contiguous with no gaps/overlaps (RBG vs prior-run-row derivation); croner DST walk across both 2026 America/New_York transitions asserting the expected boundary sequence (probe A6 graduated — fallback cron-parser per eng §15 if croner misbehaves); grace-boundary test at b + INGEST_GRACE ± 1s.",
+      "requirementIds": ["AC-2.1", "AC-2.2", "AC-2.3", "AC-2.4", "AC-2.5", "AC-6.2"],
+      "verification": [
+        { "kind": "command", "details": "pnpm test:unit -t \"sched_cursor lineage\" — property test over random scheduled×manual interleavings, gapless/overlap-free scheduled lineage (REQ-2.1 gate, RBG)" },
+        { "kind": "command", "details": "pnpm test:unit -t \"cron dst\" — boundary sequence across both 2026 America/New_York DST transitions; pnpm test:integration -t \"invalid cron\" — rejection leaves no chat_config row" },
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"multi-chat schedules\" with controlled Clock — each chat receives only its own boundaries' summaries; missed-tick catch-up e2e: skipped ticks summarized late, never dropped" }
+      ],
+      "dependsOn": ["walking-skeleton-summary-slice"],
+      "complexity": "medium"
+    },
+    {
+      "id": "tick-backpressure-and-backlog",
+      "title": "Tick scale envelope: claim cap, fair cursor, concurrency gate, backlog drain",
+      "instructions": "Implement E7 (docs/planning/03-eng.md §9) on top of the tick. Envelope (enforced by test): 500 enabled chats, 50 concurrent runs, tick < 10s. TICK_CLAIM_CAP=25 new runs per tick (plus D25's per-chat cap of 20); unclaimed due windows stay due — correctness never depends on a tick finishing its scan. Fair cursoring: due-scan orders by chat_config.last_claim_scan_at ASC and stamps scanned. Concurrency gate: defer invocation (rows still claimed) when count of live-leased running runs ≥ MAX_CONCURRENT_RUNS=50; watchdog sweeps pending runs older than one tick so deferred invocations are never stranded. Use set-based queries and the pooled Neon connection string — no per-chat round trips. Tests: backlog-drain e2e (200 chats × 10 windows behind, controlled clock): monotone drain, zero dropped windows, no duplicate claims, bounded staleness, tick wall-time bound asserted; connection-count assertion under load. NOTE (A5 provisional): the 60-concurrent-pooled-clients probe passed only locally; re-run against a real Neon pooled connection string before production sign-off and record the result in the ticket PR.",
+      "requirementIds": ["AC-2.5", "engineering-only"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"backlog drain\" — 200 chats × 10 windows behind: monotone drain, zero dropped windows, tick wall-time bound (REQ-2.5 gate)" },
+        { "kind": "command", "details": "Unit tests: claim cap honored per tick; fair-cursor ordering (no chat starves); concurrency gate defers invocation but rows stay claimed" },
+        { "kind": "agent-review", "details": "Review the due-scan SQL for set-based operation (no N+1 per chat) and confirm the stated envelope numbers appear as named constants with the enforcing test referencing them" }
+      ],
+      "dependsOn": ["scheduled-cron-window-lineage"],
+      "complexity": "medium"
+    },
+    {
+      "id": "late-webhook-assignment-repair",
+      "title": "Assignment ledger + late-webhook repair: lateness is delay, never a gap",
+      "instructions": "Implement E9 (docs/planning/03-eng.md §7). A run's input set is NOT sent_at-in-window but: non-bot messages with assigned_run_id IS NULL AND sent_at < window_end, assigned to the run (fenced write) as the workflow's first step. Skipped runs assign their in-window messages too (AC-4.5 — never rolled forward). A message ingested after its covering window finalized stays unassigned and is picked up by the NEXT run: counted in run.late_message_count and rendered under a distinct final line \"Earlier (delivered late): …\" (binding interpretation of AC-1.1 recorded in eng §7 — do not reopen posted runs, that would violate AC-5.3). Pre-join messages (AC-1.3): windows anchor to enabled_at and no pre-join fetch path exists — seed pre-join rows in a test and assert zero assignment/inclusion. Threshold counts only in-window unassigned messages; late strays alone never trigger a summary but ride along. Store ingested_at on webhook insert for lateness observability. Tests (eng §7): e2e — post window W's run, deliver a webhook for a message with sent_at inside W, assert it appears in the next posted summary's late section with late_message_count=1 (red-before-green against naive window-query logic); duplicate delivery of the same late message stays deduped (AC-1.4).",
+      "requirementIds": ["AC-1.1", "AC-1.3", "AC-1.4", "AC-4.5"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"ingestion→summary\" incl. the late-delivery variant: late message appears in the NEXT posted summary flagged late, late_message_count=1 (REQ-1.1 gate, RBG)" },
+        { "kind": "command", "details": "pnpm test:integration -t \"enabled_at anchor\" — seeded pre-join rows get zero assignment and never appear in any summary (REQ-1.3 gate); pnpm test:integration -t \"skip assignment\" — skipped window's messages excluded from next run's input (REQ-4.5 gate, RBG)" },
+        { "kind": "agent-review", "details": "Review the assignment query and window semantics against eng §7's binding AC-1.1 interpretation; confirm no code path re-opens or re-summarizes a finalized run" }
+      ],
+      "dependsOn": ["scheduled-cron-window-lineage"],
+      "complexity": "medium"
+    },
+    {
+      "id": "quiet-window-threshold-skip",
+      "title": "Quiet-window skip: per-chat threshold, bot exclusion, skipped-run record",
+      "instructions": "Implement D10 + REQ-4 on the assignment ledger. After assignment, count in-window non-bot messages; if count < chat_config.min_messages (default 3), finalize the run status='skipped' with skip_reason and the covered window recorded, post NOTHING (not even a 'nothing happened' message), and leave the assigned messages consumed (AC-4.5, already enforced by late-webhook-assignment-repair). Bot-authored messages (is_bot, including the bot's own summaries which must be ingested-or-ignored consistently — decide and record) never count toward the threshold and never appear in SummaryInput (AC-4.4). Threshold is per-chat config, editable without redeploy. Tests: e2e \"quiet skip\" — below-threshold window → outbox empty for the window, run row status='skipped'; \"threshold config\" — two chats, same single-message window, threshold-1 chat posts a schema-valid one-topic sparse summary (E13, fixture from summarizer-fixture-and-live-lanes), default-3 chat skips; integration \"bot exclusion\" — seed bot + own-summary rows, assert count=0 and absence from SummaryInput.",
+      "requirementIds": ["AC-4.1", "AC-4.3", "AC-4.4", "AC-4.5"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"quiet skip\" — empty outbox + run status='skipped' (REQ-4.1 gate); pnpm test:e2e -t \"threshold config\" — paired post/skip outcomes for threshold 1 vs 3, sparse summary schema-valid (REQ-4.3 gate)" },
+        { "kind": "command", "details": "pnpm test:integration -t \"bot exclusion\" — bot rows count 0 toward threshold and never enter SummaryInput (REQ-4.4 gate)" }
+      ],
+      "dependsOn": ["late-webhook-assignment-repair", "summarizer-fixture-and-live-lanes"],
+      "complexity": "small"
+    },
+    {
+      "id": "exactly-once-chunk-delivery",
+      "title": "Exactly-once delivery: chunker + reserve→record→edit→confirm ledger + crash-cut battery [BLOCKED: A13 human gate]",
+      "instructions": "GATE FIRST: do not start implementation until the PRD owner has accepted the AC-5.3 amendment recorded in docs/planning/03-eng.md §5/§19 item 4 (\"AC-5.3 applies to summary content; content-free placeholder messages from crash-during-send are permitted, bounded by the per-run attempt limit\") — acceptance must be recorded as an amendment in docs/planning/01-prd.md (backpressure BP-3). If a stricter protocol is mandated instead, reopen eng §5 before coding. Then implement E1 (eng §5) + D8 chunking: (1) Chunker: split rendered MarkdownV2 summaries into ≤4096-char chunks with no mid-word/mid-entity truncation, '(cont.)' continuation markers, balanced entities; property test asserts concatenation ≡ original modulo markers. (2) Per-chunk two-phase send on run_chunk states pending→reserving→reserved→edited→sent, every write fenced by lease_owner (E2): fenced reserving write-ahead; sendMessage placeholder '…' → record telegram_message_id, state='reserved'; editMessageText(chunk_text) → 'edited'; → 'sent'. A1 CAVEAT (probe unverified, no Telegram credentials): do NOT hard-code the \"message is not modified\" error-string match as the idempotency signal — implement a content-hash short-circuit before calling editMessageText, keep the string match as best-effort, and leave a TODO referencing artifacts/smithering/probes/A1/probe.sh for the live re-run (eng §19 item 5). (3) Crash-cut battery via FaultInjectingTelegramPort (all RBG — each committed failing first): concurrent two-attempt race (exactly one placeholder+edit pair per chunk, fenced loser wrote zero rows); post-send/pre-record cut per chunk index (delivered content set ≡ chunk list exactly once, orphan placeholders ≤ attempt_count, run ends 'posted'); repeated ambiguous cut across N attempts (orphans ≤ N); property-style loop injecting a cut at every state transition of a 3-chunk run. Surface attempt_count in the run detail data so the UI can explain a stray '…'.",
+      "requirementIds": ["AC-3.4", "AC-5.1", "AC-5.3"],
+      "verification": [
+        { "kind": "command", "details": "pnpm test:integration -t \"crash-cut\" — full §5 battery green with RBG runs linked per cut; orphan ≤ attempt_count invariant holds (REQ-5.3 gate)" },
+        { "kind": "command", "details": "pnpm test:unit -t \"chunker fuzz\" — random MarkdownV2-entity-laden strings: chunks ≤4096, balanced entities, concat ≡ original modulo (cont.); pnpm test:e2e -t \"chunked delivery\" — >4096-char summary delivered as ordered chunks (REQ-5.1 gate); pnpm test:e2e -t \"rendering\" — emoji/code/non-Latin fixtures render without broken entities (REQ-3.4 gate)" },
+        { "kind": "agent-review", "details": "Verify the recorded A13 acceptance exists in docs/planning/01-prd.md before merge; review the resume analysis per crash cut against eng §5 and confirm no protocol path can double-deliver content" }
+      ],
+      "dependsOn": ["run-lease-heartbeat-watchdog", "telegram-http-client-retries", "smithers-postgres-runtime"],
+      "complexity": "large"
+    },
+    {
+      "id": "first-contact-disclosure",
+      "title": "First-contact disclosure: claimed state machine on chat with retry sweep",
+      "instructions": "Implement E8 (docs/planning/03-eng.md §10) for AC-1.2. Webhook upserts chat then claims via the §10 UPDATE (pending, or sending with claim older than 10 min) — concurrent first webhooks: exactly one wins. Winner sends the D9 plain-text disclosure ('I can only summarize messages sent after I joined…', exact copy per docs/planning/02-design.md D9 and the user-guide mockup artifacts/smithering/mockups/user-guide.md) with D27 bounded retry; on success writes disclosure_status='sent' + message id + timestamp. Crash/failure leaves 'sending' with a stale claim; the cron tick sweeps and re-attempts. The crash-between-ack-and-record residual (possible duplicate greeting per crashed attempt) is accepted and folded into the A13 amendment — document it in the test. Tests: concurrent first-webhook race asserting exactly one outbox disclosure; send-failure → sweep → eventually sent; crash-cut test documenting the bounded residual.",
+      "requirementIds": ["AC-1.2"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"disclosure\" — incl. concurrent first-webhook race: exactly one disclosure per chat in telegram_outbox (REQ-1.2 gate)" },
+        { "kind": "command", "details": "Integration test: failed send leaves 'sending'; tick sweep re-claims after 10 min and disclosure eventually lands" }
+      ],
+      "dependsOn": ["telegram-http-client-retries", "scheduled-cron-window-lineage"],
+      "complexity": "small"
+    },
+    {
+      "id": "nonlossy-map-reduce-budgeting",
+      "title": "Non-lossy input budgeting: hierarchical map-reduce, paginated fetch, volume disclosure",
+      "instructions": "Implement E5 (docs/planning/03-eng.md §8). Constants: MAX_INPUT_TOKENS=80000 (chars/4 estimate, tolerance-tested against the Anthropic token-counting endpoint in the nightly lane), SEGMENT_TARGET=60000, FETCH_PAGE=5000 rows. Fits budget → single Summarizer call. Over budget → hierarchical map-reduce with no level cap: chronological contiguous segments ≤ SEGMENT_TARGET, map each to an intermediate structured summary, recursively reduce groups until one call remains — every message read by exactly one map call, nothing discarded at any volume (no MAX_MESSAGES cap exists). run.input_message_count records the true total. Depth ≥ 2 reduce levels → summary opens with \"High-volume window (N messages): condensed digest.\" Grounding under map-reduce: intermediates carry participant/link lists verbatim; the reduce prompt may only SELECT from them, never invent. Tests: boundary windows at exact budget and budget+1; 3-segment and 2-level fixtures asserting planted topics from the FIRST and LAST segment both surface; pagination fuzz around page boundaries; benchmark on the 50k-message fixture with asserted wall/token ceilings.",
+      "requirementIds": ["AC-1.1", "AC-3.3", "AC-5.1"],
+      "verification": [
+        { "kind": "command", "details": "Unit/integration: budget and budget+1 boundary tests; 2-level reduce fixture surfaces planted first- AND last-segment topics; pagination fuzz green; 50k-message benchmark under asserted ceilings" },
+        { "kind": "agent-review", "details": "Review the reduce prompt for the select-only constraint (participants/links verbatim from intermediates, no free generation) — this is what keeps the nightly grounding eval passable over map-reduce fixtures" }
+      ],
+      "dependsOn": ["summarizer-fixture-and-live-lanes"],
+      "complexity": "medium"
+    },
+    {
+      "id": "sandbox-async-executor-invocation",
+      "title": "Sandbox executor invocation: async job start + persisted jobId + poll/webhook completion (no fire-and-forget) [GATE: A2 live re-run]",
+      "instructions": "Implement the A10-amended invocation path (docs/planning/03-eng.md §19 item 1 — A10 was FALSIFIED: Vercel Functions freeze after responding; un-awaited promises die; waitUntil() is bounded by maxDuration). The tick must: start the Sandbox job via its async API, persist {jobId, status:'running'} on the run row in Postgres, and return; completion is observed by subsequent cron ticks polling job status (and/or a completion webhook), never by in-process background promises. The Sandbox task runs the smithers-postgres-runtime executor entrypoint with only run.id (D22). Enforce REQ-9.1 with an architecture unit test: exactly one executor entrypoint, no short-task branch anywhere in run dispatch. Local/Preview e2e use the Clock/Invoker port's inline invocation — the Sandbox adapter is exercised by the long-task lanes. PREREQUISITE GATE (A2, environment-blocked not refuted): before locking this architecture, run `vercel link` + `vercel env pull` with valid credentials and execute artifacts/smithering/probes/A2/run-sandbox-loop.mjs to a full 25-minute completion (evidence/run-result.json must show completed:true) — eng §19 item 3. If the Sandbox cannot sustain >20 min, STOP and reopen eng §2/§15 (no substitute exists within PRD constraints); surface this as a blocker rather than working around it. Also record the A3 consequence where deployment config lives: vercel.json cron `* * * * *` requires Vercel Pro — add a README prerequisite line and a deploy-time check if the plan tier is detectable.",
+      "requirementIds": ["AC-9.1", "AC-8.1"],
+      "verification": [
+        { "kind": "command", "details": "pnpm test:unit -t \"single executor path\" — architecture test: one entrypoint, no short-task branch (REQ-9.1 gate)" },
+        { "kind": "command", "details": "A2 probe evidence committed: artifacts/smithering/probes/A2/evidence/run-result.json with completed:true from a real 25-min Sandbox run under valid credentials" },
+        { "kind": "e2e", "details": "Integration test with a stub Invoker: tick returns <10s having persisted jobId; a later tick observes completion and the run finalizes — no reliance on in-process continuation (RBG vs fire-and-forget)" },
+        { "kind": "agent-review", "details": "Review for any un-awaited promise or waitUntil() carrying required work in Function handlers — none may exist (A10 falsification)" }
+      ],
+      "dependsOn": ["smithers-postgres-runtime", "run-lease-heartbeat-watchdog", "tick-backpressure-and-backlog"],
+      "complexity": "large"
+    },
+    {
+      "id": "machine-auth-boundaries",
+      "title": "Auth boundaries: webhook secret token, cron secret, UI token, test-route gating, cross-credential rejection",
+      "instructions": "Implement E11 (docs/planning/03-eng.md §12) exactly per the boundary table: UI pages + operator API → D18 shared-secret bearer/cookie (UI_TOKEN); /api/telegram/webhook → X-Telegram-Bot-Api-Secret-Token must equal TELEGRAM_WEBHOOK_SECRET via constant-time compare, no cookie/UI token accepted; /api/cron/tick → Authorization: Bearer CRON_SECRET; /api/test/* → only when E2E_TEST_ROUTES=1 AND D18 bearer; executor has no inbound HTTP surface. All three secrets independent, env-supplied, rotatable, README-listed. Write the §12 auth matrix integration test: every route class × {missing credential, wrong credential, the OTHER surface's credential} → 401/403; correct credential → 2xx. Also assert /api/test/* returns 404 (route absent, not 401) when E2E_TEST_ROUTES is unset — this is what keeps production safe.",
+      "requirementIds": ["AC-7.5", "AC-11.3"],
+      "verification": [
+        { "kind": "command", "details": "pnpm test:integration -t \"auth\" — full per-surface × per-credential rejection matrix green, incl. cross-credential rejection and test routes absent in prod config (REQ-7.5 gate)" },
+        { "kind": "agent-review", "details": "Review for timing-safe comparison on the webhook secret, no secret ever logged, and no route added since the eng-doc table that lacks an auth class assignment" }
+      ],
+      "dependsOn": ["walking-skeleton-summary-slice"],
+      "complexity": "small"
+    },
+    {
+      "id": "operator-ui-runs-and-config",
+      "title": "Operator UI: run list/detail with smithers step timeline, chat-config CRUD, served serverlessly",
+      "instructions": "Implement E10.3 + D11–D16 (docs/planning/03-eng.md §11, docs/planning/02-design.md, mockup artifacts/smithering/mockups/gateway-ui.html). Next.js routes on the SAME deployment (AC-7.6) reading app + smithers schemas directly from Postgres — read-model only, no gateway process (the dev-loop bun .smithers/gateway.ts is never deployed). Run list: all runs (posted/skipped/failed/running/pending) with chat, covered window, status, timing; stalled indicator when heartbeat_at older than 2 min. Run detail: outcome (posted summary text / skip_reason / failure_reason), the smithers step timeline (step name, status, timing, error) joined via run.smithers_run_id, attempt_count with the E1 placeholder-residual explanatory note, late_message_count, high-volume-mode indicator, overlap badges on manual runs (E14). Chat-config CRUD: create/view/edit/pause/re-enable with cron validation errors surfaced (AC-2.3); config changes effective next tick without redeploy (AC-6.3 — no config caching). Whole surface behind the D18 auth from machine-auth-boundaries. Tests: e2e \"ui runs\" seeding all statuses and asserting list+detail incl. step timeline; \"config crud\" full round-trip; \"pause/re-enable\" (paused chat: empty outbox, ingestion continues, re-enable covers own window only — asserts sched_cursor := enabled_at); \"config hot change\" — cron/threshold change takes effect within one tick on the same deployment.",
+      "requirementIds": ["AC-4.2", "AC-5.4", "AC-6.1", "AC-6.2", "AC-6.3", "AC-7.1", "AC-7.4", "AC-7.6"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"ui runs\" (REQ-7.1), -t \"config crud\" (REQ-6.1/7.4), -t \"pause/re-enable\" (REQ-6.2), -t \"config hot change\" (REQ-6.3), -t \"ui skipped run\" (REQ-4.2) all green locally" },
+        { "kind": "agent-review", "details": "Compare rendered UI against artifacts/smithering/mockups/gateway-ui.html for the run-detail information architecture (step timeline placement, residual note) and judge whether an operator could explain a stray '…' message and a stalled run from the UI alone" }
+      ],
+      "dependsOn": ["run-lease-heartbeat-watchdog", "scheduled-cron-window-lineage", "smithers-postgres-runtime", "machine-auth-boundaries"],
+      "complexity": "large"
+    },
+    {
+      "id": "operator-ui-manual-trigger-and-replay",
+      "title": "Operator UI actions: summarize-now over a chosen window; replay failed run via lease reset + resume",
+      "instructions": "Implement D17 + E10.4 (docs/planning/03-eng.md §6.1, §2). Summarize now: operator picks a chat and window; claim via D2 insert with trigger='manual'; NEVER touch sched_cursor (E14); non-exact overlap with scheduled windows is allowed and badged on both runs; the resulting summary posts and appears as a run. Replay on a failed run: fenced reset of the run's lease/attempt state and re-invoke the executor for the SAME run.id — the executor resumes the SAME smithers run, re-executing only from the first non-completed step; never a new window or new smithers run. This is deliberately the identical code path the watchdog uses (one resume path, exercised by both AC-7.3 and AC-9.4 tests). Tests: e2e \"summarize now\" — outbox post, run row trigger='manual', sched_cursor unchanged (REQ-7.2 gate); e2e \"ui replay\" — fail a run (fault plan), replay from UI, assert same run.id/smithers_run_id resumed and completed steps not re-executed (REQ-7.3 gate).",
+      "requirementIds": ["AC-7.2", "AC-7.3"],
+      "verification": [
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"summarize now\" — manual run posts, sched_cursor untouched (REQ-7.2 gate); pnpm test:e2e -t \"ui replay\" — same run.id/smithers_run_id resumed, completed steps not re-executed (REQ-7.3 gate)" },
+        { "kind": "agent-review", "details": "Confirm replay and watchdog share one code path (no divergent resume logic) and that no replay flow can create a second run row for the same (chat, window)" }
+      ],
+      "dependsOn": ["operator-ui-runs-and-config", "sandbox-async-executor-invocation"],
+      "complexity": "medium"
+    },
+    {
+      "id": "neon-preview-ci-pipeline",
+      "title": "Preview pipeline: Neon branch per PR, Preview e2e lane, push-button PR→production",
+      "instructions": "Implement D29 + AC-10.3/10.5 (docs/planning/02-design.md, eng §14.4). CI creates a Neon branch per PR (isolated per-preview database), injects its connection string into the Vercel Preview deployment env, runs the SAME e2e suite against the Preview URL (`pnpm test:e2e --base-url $PREVIEW_URL` — same tests as local, fake outbox Telegram via /api/test/outbox, fixture summarizer), deletes the branch on PR close. Make the Preview e2e job a branch-protection required check. Preview e2e must include the UI-origin assertion (REQ-7.6: UI routes respond on the deployment's own origin) and the single-store restore test (REQ-8.2: fresh deployment pointed at an existing DB restores history). Pipeline must be push-button (AC-10.5): PR → preview deploy + DB → e2e → merge → automatic production deploy, zero manual steps — record one full pipeline run end-to-end as evidence. DEPLOYMENT PREREQUISITE (A3 falsified on Hobby): the vercel.json 1-minute cron requires Vercel Pro; document it and fail loudly if cron registration is rejected. A4 caveat (provisional pass): re-run the Neon branch-create probe with a real SQL round-trip and under concurrent PR fan-out on the CI-scoped quota; record timings in the PR. Follow-up from eng §19 item 2: after first Pro deployment, instrument the live cron for ≥1h and record the actual firing rate in artifacts/smithering/probes/A3/.",
+      "requirementIds": ["AC-7.6", "AC-8.2", "AC-10.2", "AC-10.3", "AC-10.5"],
+      "verification": [
+        { "kind": "e2e", "details": "Preview e2e lane green against a real PR's Preview URL with its own Neon branch; branch-protection config shows it as a required check (REQ-10.3 gate)" },
+        { "kind": "command", "details": "pnpm test:e2e local lane green (REQ-10.2 gate); CI build-scan step asserts no *.db/sqlite artifact in build output (REQ-8.2 support)" },
+        { "kind": "agent-review", "details": "Walk the recorded full pipeline run (PR through auto production deploy) and attest zero manual interventions, naming each stage link (REQ-10.5 gate evidence)" }
+      ],
+      "dependsOn": ["ci-coverage-and-secret-gates", "machine-auth-boundaries"],
+      "complexity": "medium"
+    },
+    {
+      "id": "longtask-proof-lanes",
+      "title": "Long-task proof: >20-min nightly fixture, per-PR scaled variant, crash-resume",
+      "instructions": "Implement REQ-9's gates (eng §14.4 lanes, backpressure REQ-9.2/9.3/9.4). Build ONE long-task e2e fixture that performs real incremental work continuously (e.g. a work loop writing checksummed progress rows via the standard executor path — same entrypoint as summarize, per the REQ-9.1 architecture test), parameterized by duration. Nightly lane (`pnpm test:e2e:longtask`, Neon branch): >20-minute run, wall-clock duration asserted, incremental output checksummed, heartbeat trace recorded — blocking for release/acceptance, not per-PR merge. Per-PR variant: identical mechanism and entrypoint (assert shared code — the test imports the same fixture module), short duration, required PR check (REQ-9.3). Crash test (`longtask crash`): kill mid-run, watchdog/replay resumes via the E10.4 path, side-effect ledger asserted exactly-once (REQ-9.4, RBG). Record smithering dev-run transcripts as supporting evidence only in the acceptance note (REQ-9.5 informational — never a substitute). This ticket depends on the A2 gate having passed in sandbox-async-executor-invocation; if the nightly run hits a Sandbox ceiling, that is a release blocker to surface, not to patch around.",
+      "requirementIds": ["AC-9.2", "AC-9.3", "AC-9.4", "AC-9.5"],
+      "verification": [
+        { "kind": "e2e", "details": "Nightly pnpm test:e2e:longtask — asserted >20-min wall clock, output checksum verified, heartbeat trace present (REQ-9.2 gate); pnpm test:e2e -t \"longtask short\" green as a required PR check (REQ-9.3 gate)" },
+        { "kind": "e2e", "details": "pnpm test:e2e -t \"longtask crash\" — simulated mid-run crash resumes to correct result, side-effect count exactly-once (REQ-9.4 gate, RBG)" },
+        { "kind": "agent-review", "details": "Verify the PR variant and nightly fixture share the same entrypoint/mechanism (no separate short-task shortcut smuggled in) and that REQ-9.5 evidence is labeled supporting-only" }
+      ],
+      "dependsOn": ["sandbox-async-executor-invocation", "neon-preview-ci-pipeline"],
+      "complexity": "medium"
+    },
+    {
+      "id": "grounding-eval-nightly",
+      "title": "Nightly grounding eval: no fabricated participants/decisions/events over live LLM output",
+      "instructions": "Implement the AC-3.3 eval (eng §14.3, backpressure BP-2). `pnpm eval:grounding`: run the e2e fixture windows (including the map-reduce multi-segment fixtures from nonlossy-map-reduce-budgeting) through SUMMARIZER_MODE=anthropic, then evaluate each output against its source window: every named participant, decision, action item, and link must be traceable to a source message (string/entity matching where possible, LLM-judge with citations for paraphrase cases — the judge must cite the source message id or fail the item). Zero fabricated-entity findings is the pass bar. Runs in the nightly lane with ANTHROPIC_API_KEY; skips cleanly (exit 0, status skipped) without the key. Blocking for release/acceptance, not per-PR merge (BP-2). Per-PR proxy (SummarySchema validation in fixture mode) is already wired via AC-3.2's gate. A7 note: while probe A7 remains unverified, this nightly lane is the ACTUAL schema/grounding gate — when a key is first available, also run artifacts/smithering/probes/A7/probe.mjs and record pass-rate numbers in the probe README. On grounding failure: tighten prompts or the reduce-select constraint (eng §8), never relax the eval.",
+      "requirementIds": ["AC-3.3", "AC-10.4"],
+      "verification": [
+        { "kind": "command", "details": "pnpm eval:grounding with a real key: per-fixture grounding scores emitted, zero fabricated-entity findings, incl. map-reduce fixtures (REQ-3.3 gate); without key: exits 0 with explicit skipped status" },
+        { "kind": "agent-review", "details": "Review the eval's traceability method: can it actually FAIL on a plausible fabrication (plant one in a canned output and confirm it is flagged)? An eval that cannot fail is not a gate" }
+      ],
+      "dependsOn": ["nonlossy-map-reduce-budgeting"],
+      "complexity": "medium"
+    },
+    {
+      "id": "telegram-access-deploy-check",
+      "title": "Telegram group-message access: check:telegram deploy gate, webhook registration, UI banner",
+      "instructions": "Implement E12 (docs/planning/03-eng.md §13). (1) `pnpm check:telegram` (also a post-deploy step and a red banner in the operator UI): calls getMe and fails unless can_read_all_group_messages === true; calls getWebhookInfo and fails unless the URL matches the deployment, allowed_updates includes \"message\", and last_error_date is not recent. (2) Webhook registration helper: setWebhook with allowed_updates: [\"message\",\"my_chat_member\"] and the E11 secret_token. (3) README/D20 setup checklist amendment: BotFather /setprivacy → Disable BEFORE adding the bot to any chat (privacy changes apply only on re-add — order the steps accordingly). (4) Startup guard per eng §19 item 6: warn loudly (log + UI banner) if can_read_all_group_messages is false — do NOT gate CI/merge on it (A11 is environment-blocked, not refuted; the live validation happens in live-telegram-smoke-lane). Unit/integration tests run against a mocked getMe/getWebhookInfo: each failure mode produces the specific named error.",
+      "requirementIds": ["AC-1.1", "engineering-only"],
+      "verification": [
+        { "kind": "command", "details": "Integration tests with mocked Telegram API: check:telegram fails on privacy-mode-on, wrong webhook URL, missing allowed_updates, recent last_error_date; passes on the healthy shape" },
+        { "kind": "agent-review", "details": "Review the README setup checklist ordering against Telegram's re-add semantics (privacy toggle before bot added) and confirm the failure mode is loud-pre-traffic, not silent ingestion loss" }
+      ],
+      "dependsOn": ["telegram-http-client-retries"],
+      "complexity": "small"
+    },
+    {
+      "id": "live-telegram-smoke-lane",
+      "title": "Opt-in live-Telegram smoke: send round-trip + human-prompted ingestion check; clean skip without token; A1/A11 probe graduation",
+      "instructions": "Implement D30 + E12's live lane + AC-10.4 (eng §13, §14.4, §19 items 5–6). CI job matrix: with-token leg (TELEGRAM_BOT_TOKEN + dedicated test chat) runs the smoke — send round-trip, getMe/getWebhookInfo assertions, and the ingestion check (a plain human/user message must reach `message` within 60s; bots cannot see other bots' messages, so local opt-in runs use prompted mode: print \"send any message in <chat> now\" and poll; the nightly lane asserts only the getMe/getWebhookInfo checks unconditionally). Without-token leg: asserts the suite result is `skipped` with exit 0 — a skip that reports failure blocks merge. Manual setup doc (per eng §19 item 6): human creates the bot, disables privacy mode BEFORE adding to the group, confirms can_read_all_group_messages. PROBE GRADUATION on first live run, record evidence in the probe dirs: A11 (artifacts/smithering/probes/A11/) — plain group message reaches the webhook; A1 (artifacts/smithering/probes/A1/probe.sh) — edit-to-identical-content returns \"message is not modified\"; if A1 confirms, the content-hash short-circuit in exactly-once-chunk-delivery may treat the string match as verified (update the TODO); if it REFUTES, reopen eng §5.",
+      "requirementIds": ["AC-10.4", "AC-1.1", "AC-3.4"],
+      "verification": [
+        { "kind": "command", "details": "CI matrix: no-token leg exits 0 with explicit skipped (not failed) status (REQ-10.4 gate); with-token leg green including ingestion-within-60s assertion when run against a real bot" },
+        { "kind": "agent-review", "details": "Review recorded A1 and A11 probe evidence after the first live run and confirm the eng-§19 TODOs (idempotency string-match, privacy-mode guard) were updated to match reality" }
+      ],
+      "dependsOn": ["telegram-access-deploy-check", "neon-preview-ci-pipeline"],
+      "complexity": "small"
+    },
+    {
+      "id": "template-readme-and-fresh-eyes",
+      "title": "Template-quality README + fresh-eyes walkthrough gates (clone → local stack → own-account deploy)",
+      "instructions": "Write the adopter-facing docs (REQ-11, D19–D20, eng §13 setup gate, §12 secret inventory) and run the release walkthrough gates (backpressure BP-6). README: local-first development (run + test everything locally with mocked Telegram), then documented deploy steps to Vercel — including the HARD PREREQUISITES: Vercel Pro plan (1-minute cron, A3), Neon Postgres via Marketplace, and the BotFather privacy-mode checklist in the E12 order. Env-var table listing every required variable (UI_TOKEN, TELEGRAM_WEBHOOK_SECRET, CRON_SECRET, DATABASE_URL, TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY, SUMMARIZER_MODE, E2E_TEST_ROUTES…) — must satisfy `pnpm check:env-docs`. Fill the anchored sections from ci-coverage-and-secret-gates: pre-install-history limitation and quiet-window-skip behavior, consistent with artifacts/smithering/mockups/user-guide.md. Include an architecture section linking the smithers-on-Vercel pattern to the spike transcripts (eng §16). Then execute the fresh-eyes gates: an agent with NO repo context, following ONLY the README, (a) reaches a working local stack with tests green, and (b) deploys to a separate Vercel account/Postgres and runs `pnpm test:e2e --base-url <their deployment>` green (AC-8.3/AC-11.1 may share one run). Evidence = the walkthrough transcript PLUS the command outputs/green e2e run URL — the transcript alone is insufficient (BP-6). Fix README gaps found and re-run until clean.",
+      "requirementIds": ["AC-8.3", "AC-11.1", "AC-11.2", "AC-11.3"],
+      "verification": [
+        { "kind": "agent-review", "details": "Fresh-eyes agent (no repo context, README only): local stack up + tests green, then own-account Vercel+Postgres deployment with green e2e against it — transcript plus command output/e2e run URL required (REQ-8.3 + REQ-11.1 gates)" },
+        { "kind": "command", "details": "pnpm check:env-docs green; pnpm test:unit -t \"docs markers\" green with real content behind the anchors; gitleaks clean over final history (REQ-11.2/11.3 gates)" }
+      ],
+      "dependsOn": ["neon-preview-ci-pipeline", "live-telegram-smoke-lane", "longtask-proof-lanes", "operator-ui-manual-trigger-and-replay", "exactly-once-chunk-delivery", "quiet-window-threshold-skip", "first-contact-disclosure", "grounding-eval-nightly"],
+      "complexity": "medium"
+    }
+  ]
+}

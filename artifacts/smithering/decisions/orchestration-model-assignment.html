@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision: model assignment — Anthropic implements, OpenAI reviews</title>
+<style>body{font:16px/1.5 system-ui;max-width:60rem;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:2rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:.4rem .6rem;text-align:left}.win{background:#eafaea}.lose{background:#faf0f0}.note{background:#fff8e1;padding:.6rem .8rem;border-left:4px solid #e0b400}</style></head><body>
+<h1>O4 — Model assignment per role × ticket complexity</h1>
+<p><b>Context:</b> 06-orchestration.md O4 · 2026-07-01. Hard constraint: reviewing model family ≠ implementing model family, for every ticket.</p>
+
+<h2>Decision</h2>
+<table>
+<tr><th>Complexity</th><th>Implementer</th><th>Reviewer</th><th>Verifier</th></tr>
+<tr><td>small (2,10,12,15,21,22)</td><td><code>claude-sonnet-5</code></td><td>GPT-5.4 (codex CLI)</td><td><code>claude-sonnet-5</code></td></tr>
+<tr><td>medium (3,4,6,7,8,9,13,17,18,19,20,23)</td><td><code>claude-sonnet-5</code></td><td>GPT-5.4 (codex CLI)</td><td><code>claude-fable-5</code> (fb <code>claude-opus-4-8</code>)</td></tr>
+<tr><td>large (1,5,11,14,16)</td><td><code>claude-fable-5</code> (fb <code>claude-opus-4-8</code>)</td><td>GPT-5.4 (codex CLI)</td><td><code>claude-fable-5</code> (fb <code>claude-opus-4-8</code>)</td></tr>
+</table>
+<p>Static pairing — Anthropic always implements and verifies, OpenAI always reviews — so the family rule holds by construction on all 23 tickets with no per-ticket bookkeeping.</p>
+
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Verdict</th></tr>
+<tr class="win"><td><b>Static: Claude implements / Codex reviews (chosen)</b></td><td>One rule, provable by inspection; matches project model policy (planning/review models = fable-5, execution = sonnet) and the available codex skill.</td></tr>
+<tr class="lose"><td>Alternate families per ticket (Codex implements some tickets)</td><td>Rejected: project model policy pins execution to Claude Sonnet; Codex as implementer would put the weaker-integrated toolchain on the harder job, and the family rule then needs per-ticket verification.</td></tr>
+<tr class="lose"><td>Claude Fable reviews Claude Sonnet ("different model = different reviewer")</td><td>Rejected: violates the rule — same family. Also forbidden as a runtime fallback: if codex CLI is unavailable, the run PAUSES and surfaces a blocker rather than reviewing same-family.</td></tr>
+</table>
+
+<h2>Role contracts (example I/O)</h2>
+<table>
+<tr><th>Role</th><th>Input</th><th>Output (evidence file)</th></tr>
+<tr><td>Implementer</td><td>ticket JSON + doc paths + worktree</td><td>code+tests, <code>plan.md</code>, <code>diff.patch</code>, <code>rbg/</code> logs</td></tr>
+<tr><td>Reviewer (adversarial)</td><td><code>plan.md</code> + <code>diff.patch</code> + ticket + backpressure rows</td><td><code>review.json</code>: <code>{"model":"gpt-5.4","verdict":"findings|clean","findings":[{"file":"…","line":…,"claim":"…"}]}</code> — "clean" requires stated reasons</td></tr>
+<tr><td>Verifier</td><td>fresh context; ticket gate rows + evidence path</td><td><code>verify.json</code>: gates re-executed with exit codes, RBG failing-run re-checked, <code>{"verdict":"pass|fail"}</code></td></tr>
+</table>
+
+<div class="note"><b>Standing model facts:</b> <code>claude-sonnet-4-7</code> does not exist — never request it. Fallbacks: fable-5 → opus-4-8; sonnet-5 → sonnet-4-6.</div>
+</body></html>

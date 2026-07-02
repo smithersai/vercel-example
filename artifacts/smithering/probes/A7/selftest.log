@@ -1,0 +1,7 @@
+PASS valid-single-topic (valid=true, expected=true)
+PASS valid-seven-topics (valid=true, expected=true)
+PASS invalid-zero-topics (valid=false, expected=false)
+PASS invalid-eight-topics (valid=false, expected=false)
+PASS invalid-missing-window (valid=false, expected=false)
+PASS invalid-non-string-participant (valid=false, expected=false)
+all validator self-tests passed

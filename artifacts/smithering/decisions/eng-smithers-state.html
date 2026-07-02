@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Decision: smithers state lives in the same Postgres</title>
+<style>body{font:15px/1.55 -apple-system,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}pre{background:#f5f5f5;padding:.8rem;overflow:auto;border-radius:6px}
+table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.35rem .6rem;text-align:left;vertical-align:top}
+.win{background:#eaf7ea}.note{color:#666;font-size:.9em}</style></head><body>
+<h1>Decision: smithers workflow state in the app's Neon Postgres — probed first, fixed upstream if broken</h1>
+<p class="note">2026-07-01 · docs/planning/03-eng.md §1.5, probe A4 · serves AC-8.2</p>
+
+<h2>What was decided</h2>
+<p>Smithers' own run/workflow state uses the <em>same</em> Neon Postgres database as the app
+tables (chat, message, run, run_chunk) — no SQLite file, no second store, in any
+preview/production environment. Because this is the one integration nobody has done
+before (the PRD says so explicitly), it gets a <strong>blocking probe (A4)</strong>: a 3-step
+workflow in a Sandbox, killed mid-run, must resume from Postgres alone. Any gap found is
+fixed upstream in <code>/Users/williamcory/smithers</code> (we maintain it), never worked around
+locally.</p>
+
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Why rejected / accepted</th></tr>
+<tr class="win"><td><b>Same Postgres, smithers tables alongside app tables (chosen)</b></td><td>AC-8.2 requires it verbatim ("all persistent state … in the single Postgres database"); also makes "point a fresh deploy at the DB and everything resumes" literally true.</td></tr>
+<tr><td>Separate Postgres database for smithers state</td><td>Still "Postgres-only" in spirit, but breaks the one-database restore guarantee and doubles the Neon-branch-per-preview plumbing; no benefit.</td></tr>
+<tr><td>SQLite in the Sandbox (smithers default)</td><td>Sandbox filesystem is ephemeral — state dies with the invocation, killing crash-resume (AC-8.1/9.4); explicitly banned by PRD non-goals.</td></tr>
+<tr><td>Skip smithers for the bot's own runs; use it only for dev workflow</td><td>The pattern <em>is</em> the product — a template that doesn't run smithers serverlessly proves nothing to the adopter audience.</td></tr>
+</table>
+
+<h2>Example: what probe A4 must show</h2>
+<pre>1. smithers up summarize.tsx  (Postgres backend, inside Sandbox)
+2. step1 completes → row in smithers state tables
+3. kill -9 the sandbox process after step1
+4. re-invoke with same runId
+   ✅ pass: step2/step3 run, step1 NOT re-executed, no *.db file exists
+   ❌ fail: smithers bug → fix in /Users/williamcory/smithers + tests, re-probe</pre>
+</body></html>

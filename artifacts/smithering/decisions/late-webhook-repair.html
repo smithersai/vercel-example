@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision E9 — Ingest grace + late-webhook repair</title>
+<style>body{font:15px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}pre{background:#f6f8fa;padding:.8rem;border-radius:6px;overflow-x:auto;font-size:13px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem;text-align:left}.rej{color:#8a5a00}.pick{color:#0a6b2d;font-weight:600}</style></head><body>
+<h1>E9 — Late Telegram webhook delivery must not create summary gaps (eng doc §7, v3)</h1>
+<p><b>Context.</b> Review (critical finding 2): Telegram retries webhook delivery for up to ~24h. v2 selected run input by <code>sent_at ∈ [window_start, window_end)</code>; a message ingested after its window posted would be stored but never summarized — a permanent gap violating AC-1.1/AC-2.1.</p>
+<h2>Decision</h2>
+<ol>
+<li><b>Ingest grace</b>: a boundary <code>b</code> is due only at <code>b + INGEST_GRACE</code> (120s). Absorbs jitter; boundaries unchanged.</li>
+<li><b>Assignment ledger</b>: run input = non-bot messages with <code>assigned_run_id IS NULL AND sent_at &lt; window_end</code>, assigned (fenced) as the first workflow step. Skipped runs assign too (preserves AC-4.5).</li>
+<li><b>Repair</b>: a message ingested after its covering window finalized stays unassigned → next run includes it under an explicit <i>“Earlier (delivered late)”</i> line, counted in <code>run.late_message_count</code>.</li>
+</ol>
+<h2>Example</h2>
+<pre>Window W = [14:00,15:00) posts at 15:02.
+15:40 Telegram finally delivers msg M (sent_at 14:37).
+M inserts with assigned_run_id NULL.
+16:00 run: input includes M → summary ends:
+  "Earlier (delivered late): Alice shared the deploy checklist (14:37)."</pre>
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td>Long close-delay (e.g. 30 min) only</td><td class="rej">Rejected</td><td>Delays every summary; still loses >delay-late deliveries (retries can span hours).</td></tr>
+<tr><td>Reopen/edit the already-posted summary</td><td class="rej">Rejected</td><td>Re-summarizing a posted window collides with AC-5.3 exactly-once; edit churn is spammy.</td></tr>
+<tr><td>Telegram getUpdates cursor reconciliation</td><td class="rej">Rejected</td><td>getUpdates and webhook are mutually exclusive modes; can't run both.</td></tr>
+<tr><td class="pick">Grace + unassigned-message repair with late flag</td><td class="pick">Chosen</td><td>No gaps at any lateness, no reopening, honest attribution; one query change.</td></tr>
+</table>
+<p><b>Recorded interpretation.</b> AC-1.1's "next summary whose window covers it" is read, for delayed delivery only, as "next posted summary, flagged late" — the alternative violates AC-5.3. Red-before-green: the repair e2e provably fails against v2's window query.</p>
+</body></html>

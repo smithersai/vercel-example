@@ -1,0 +1,6 @@
+[t+0ms] tick: invoked
+[t+0ms] sandbox task: started
+[t+1ms] tick: returning
+[t+1ms] tick: returned response {"status":202} (handler-return elapsed)
+[t+5002ms] sandbox task: finished
+[t+6002ms] probe: done waiting, exiting

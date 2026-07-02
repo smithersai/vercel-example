@@ -1,0 +1,2 @@
+error: cannot lock ref 'HEAD': Unable to create '/Users/williamcory/vercel-example/.git/HEAD.lock': Operation not permitted
+Switched to a new branch 'remediation/slice-1'

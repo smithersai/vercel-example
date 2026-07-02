@@ -1,0 +1,15 @@
+↻ Smithers refreshed the `smithers` agent skill (Claude Code, Pi).
+⚠ Retired smithers skill still installed as a plugin — remove via the host agent's plugin manager:
+  /Users/williamcory/.claude/plugins/marketplaces/smithers/plugins/smithers/skills/fix-build
+  /Users/williamcory/.claude/plugins/marketplaces/smithers/plugins/smithers/skills/smithers
+runId: a12-probe-1
+logFile: /Users/williamcory/vercel-example/artifacts/smithering/probes/A12/a12-probe-1.log
+pid: 896
+cta:
+  description: "Next steps:"
+  commands[5]{command,description}:
+    smithers logs a12-probe-1,Tail run logs
+    smithers chat a12-probe-1 --follow,Watch agent chat
+    smithers ps,List all runs
+    smithers inspect a12-probe-1,Inspect run state
+    smithers skills add,sync outdated skills

@@ -1,0 +1,44 @@
+bun test v1.3.14 (0d9b296a)
+
+test/unit/trigger-summary.test.ts:
+(pass) triggerSummary > invokes the executor only for the caller that claimed the run [6.03ms]
+
+test/unit/pipeline-db.test.ts:
+(pass) PostgresRunClaimer > returns claimed when insert wins the natural-key race [0.17ms]
+(pass) PostgresRunClaimer > returns the existing run id when insert loses the natural-key race [0.04ms]
+(pass) PostgresRunClaimer > fails closed if a conflict cannot be resolved to an existing run [0.08ms]
+(pass) ingestUpdate > requires message updates [0.12ms]
+(pass) ingestUpdate > upserts chat and deduplicates messages through Postgres [0.10ms]
+(pass) summary rendering and adapters > summarizes, validates, and renders grounded message content [1.11ms]
+(pass) summary rendering and adapters > records fake Telegram sends in the Postgres outbox [0.11ms]
+(pass) executeRun > throws when the run row is missing [0.15ms]
+(pass) executeRun > does nothing for already posted runs [0.04ms]
+(pass) executeRun > executes a claimed pending run through summary persistence and delivery [0.11ms]
+(pass) container and pool wiring > uses supplied overrides without opening a default database connection [0.06ms]
+(pass) container and pool wiring > wires a default inline invoker when no invoker override is supplied [0.07ms]
+(pass) container and pool wiring > fails fast when DATABASE_URL is missing, and can close an unopened pg pool [0.24ms]
+
+test/unit/auth-routes.test.ts:
+(pass) route auth gates > rejects missing and wrong Telegram webhook secrets, then accepts the right secret [0.52ms]
+(pass) route auth gates > requires operator bearer auth for the manual trigger route [0.47ms]
+(pass) route auth gates > requires cron bearer auth for the scheduled summary route [0.23ms]
+(pass) route auth gates > keeps the test outbox route gated by E2E_TEST_ROUTES, operator auth, and production [0.20ms]
+(pass) route auth gates > covers direct auth helper edge cases [0.05ms]
+
+test/integration/migration-shape.test.ts:
+(pass) core migration shape > defines the durable tables and idempotency constraints required by the scaffold [0.10ms]
+
+test/e2e/route-smoke.test.ts:
+(pass) route smoke e2e > accepts an authenticated webhook and authenticated manual trigger through route handlers [0.23ms]
+
+artifacts/smithering/probes/A9/src/sqlFence.test.ts:
+(pass) extractSqlFence > branch A: returns null when no opening fence [0.04ms]
+(pass) extractSqlFence > branch C: returns null when no closing fence [0.01ms]
+(pass) extractSqlFence > branch E: returns trimmed body on happy path [0.01ms]
+(pass) extractSqlFence > branch B: returns null when opening fence has no trailing newline
+(pass) extractSqlFence > branch D: returns null when sql body is empty
+
+ 26 pass
+ 0 fail
+ 88 expect() calls
+Ran 26 tests across 6 files. [73.00ms]

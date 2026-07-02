@@ -1,0 +1,82 @@
+$ vitest run test/unit
+
+ RUN  v4.1.9 /Users/williamcory/vercel-example
+
+ ❯ test/unit/auth-routes.test.ts (4 tests | 4 failed) 28ms
+     × rejects missing and wrong Telegram webhook secrets, then accepts the right secret 14ms
+     × requires operator bearer auth for the manual trigger route 4ms
+     × requires cron bearer auth for the scheduled summary route 5ms
+     × keeps the test outbox route gated by E2E_TEST_ROUTES, operator auth, and production 3ms
+ ❯ test/unit/trigger-summary.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/unit/trigger-summary.test.ts [ test/unit/trigger-summary.test.ts ]
+Error: Cannot find package '@/src/pipeline' imported from /Users/williamcory/vercel-example/test/unit/trigger-summary.test.ts
+ ❯ test/unit/trigger-summary.test.ts:2:1
+      1| import { describe, expect, it } from "vitest";
+      2| import { triggerSummary, type ClaimRunArgs, type TriggerContainer } fr…
+       | ^
+      3|
+      4| class AtomicFakeClaimer {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/unit/auth-routes.test.ts > route auth gates > rejects missing and wrong Telegram webhook secrets, then accepts the right secret
+Error: Cannot find package '@/app/api/telegram/webhook/route' imported from /Users/williamcory/vercel-example/test/unit/auth-routes.test.ts
+ ❯ test/unit/auth-routes.test.ts:24:22
+     22|     vi.doMock("@/src/ingest", () => ({ ingestUpdate }));
+     23|
+     24|     const { POST } = await import("@/app/api/telegram/webhook/route");
+       |                      ^
+     25|     const body = JSON.stringify({
+     26|       update_id: 1,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/unit/auth-routes.test.ts > route auth gates > requires operator bearer auth for the manual trigger route
+Error: Cannot find package '@/app/api/trigger/route' imported from /Users/williamcory/vercel-example/test/unit/auth-routes.test.ts
+ ❯ test/unit/auth-routes.test.ts:71:22
+     69|     vi.doMock("@/src/pipeline", () => ({ triggerSummary }));
+     70|
+     71|     const { POST } = await import("@/app/api/trigger/route");
+       |                      ^
+     72|     const body = JSON.stringify({
+     73|       chatId: 42,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/unit/auth-routes.test.ts > route auth gates > requires cron bearer auth for the scheduled summary route
+Error: Cannot find package '@/app/api/cron/summary/route' imported from /Users/williamcory/vercel-example/test/unit/auth-routes.test.ts
+ ❯ test/unit/auth-routes.test.ts:116:21
+    114|     }));
+    115|
+    116|     const { GET } = await import("@/app/api/cron/summary/route");
+       |                     ^
+    117|
+    118|     expect(await GET(new Request("https://example.test/api/cron/summar…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/unit/auth-routes.test.ts > route auth gates > keeps the test outbox route gated by E2E_TEST_ROUTES, operator auth, and production
+Error: Cannot find package '@/app/api/test/outbox/route' imported from /Users/williamcory/vercel-example/test/unit/auth-routes.test.ts
+ ❯ test/unit/auth-routes.test.ts:141:21
+    139|     }));
+    140|
+    141|     const { GET } = await import("@/app/api/test/outbox/route");
+       |                     ^
+    142|
+    143|     expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed (4)
+   Start at  04:19:54
+   Duration  565ms (transform 46ms, setup 47ms, import 22ms, tests 28ms, environment 0ms)
+
+error: script "test:unit" exited with code 1

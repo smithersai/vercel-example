@@ -1,0 +1,159 @@
+{
+  "verify": {
+    "pass": false,
+    "model": "claude-fable-5",
+    "rebasedTip": {
+      "base": "8c8fed6896fab7739e13550ef05a472f0a87fd6c",
+      "ok": true
+    },
+    "gatesRun": [
+      {
+        "criterionId": "REQ-1.1",
+        "command": "pnpm test:e2e -t \"walking skeleton\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "REQ-1.4",
+        "command": "pnpm test:integration -t \"webhook dedup\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "REQ-3.1",
+        "command": "pnpm test:unit -t \"window header\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "REQ-8.2",
+        "command": "pnpm test:integration -t \"single store\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "REQ-8.2-fk",
+        "command": "pnpm test:integration -t \"schema conformance\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "tier-unit-full",
+        "command": "pnpm test:unit",
+        "status": "green"
+      },
+      {
+        "criterionId": "tier-integration-full",
+        "command": "pnpm test:integration",
+        "status": "green"
+      },
+      {
+        "criterionId": "tier-e2e-full",
+        "command": "pnpm test:e2e",
+        "status": "green"
+      },
+      {
+        "criterionId": "typecheck",
+        "command": "npx tsc --noEmit",
+        "status": "green"
+      }
+    ],
+    "evidenceChecked": [
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/plan.md",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/diff.patch",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/gates.json",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-1.1.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-1.4.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-3.1.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-8.2.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.1-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.1-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.4-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.4-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-3.1-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-3.1-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-8.2-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-8.2-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-8.2-fk-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-8.2-fk-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/decisions/",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/review.json",
+        "ok": true
+      }
+    ],
+    "infra": false,
+    "feedback": "All declared Tier-1 gates re-ran green on the integration tip (8c8fed6; rebase was a no-op) and the RBG red for REQ-8.2-fk was re-confirmed real by re-running the failing-first commit ced567e against a fresh database (1 failed). tsc --noEmit is clean and no smithers.db* files exist. However the reviewer's high-severity finding in review.json (approved=false) is CONFIRMED by live reproduction: triggerSummary() in src/pipeline.ts discards the `claimed` flag from claimRun() and always calls invoker.invokeExecutor(runId); executeRun()'s status==='posted' guard is not atomic, so two concurrent manual triggers for the same chat+window produced runCount=1 but outboxCount=2 (duplicate summary delivery). This violates the ticket's D2 claim contract ('claims a run row ... via INSERT ... ON CONFLICT DO NOTHING'): the durable claim must gate execution. Fix: only invoke the executor when claimed=true (or make executeRun's pending->running transition an atomic conditional UPDATE ... WHERE status='pending' RETURNING and no-op otherwise), plus an integration test with two concurrent triggerSummary calls asserting exactly one outbox row. Note: the worktree was delivered with the entire evidence bundle deleted (uncommitted deletions of plan.md, gates.json, all logs, verify.json); I restored from HEAD before verifying — the implementer must not leave the contractual artifacts deleted in the working tree."
+  },
+  "review": {
+    "approved": false,
+    "model": "gpt-5.4",
+    "findings": [
+      {
+        "severity": "high",
+        "title": "The loser of the run claim race still executes and double-sends the summary",
+        "detail": "The manual trigger path does not use the durable `(chat_id, window_start, window_end)` claim as an execution gate. `claimRun()` returns `claimed: false` on the losing side of `ON CONFLICT DO NOTHING`, but `triggerSummary()` ignores that flag and still invokes the executor; `executeRun()` only stops once `status='posted'`. On this tree, running two concurrent `triggerSummary()` calls for the same chat/window produced `runCount: 1` and `outboxCount: 2`, so one durable run row still yields duplicate delivery. That violates the ticket's D2 claim contract for the manual summarize path.",
+        "file": "src/pipeline.ts:18"
+      },
+      {
+        "severity": "high",
+        "title": "The current worktree deletes the ticket's required evidence bundle",
+        "detail": "The review target currently has `plan.md`, `diff.patch`, `gates.json`, the required `test-output/*` logs, the required `rbg/*` logs, and the ticket decision docs deleted under `artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/`. O6 says absence of any required run-scoped evidence file is a gate failure, never a pass. I could inspect the committed copies via `HEAD`, but the delivered worktree itself is missing the contractual artifact set.",
+        "file": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice"
+      }
+    ],
+    "reasons": "Not approved. I re-ran the named ticket gates (`pnpm test:e2e -t \"walking skeleton\"`, `pnpm test:integration -t \"webhook dedup\"`, `pnpm test:unit -t \"window header\"`, `pnpm test:integration -t \"single store\"`), plus `pnpm test:integration -t \"schema conformance\"` and `npx tsc --noEmit`; they are green, and the `assigned_run_id` foreign key now matches eng §4. The remaining blocker is behavioral: concurrent manual triggers for the same window still duplicate delivery because the losing claimant executes anyway. Separately, the current worktree has deleted the run-scoped evidence bundle that O6 requires for landing."
+  },
+  "challenge": null,
+  "missing": [],
+  "pass": false
+}

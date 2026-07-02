@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision E10 — Smithers serverless runtime</title>
+<style>body{font:15px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}pre{background:#f6f8fa;padding:.8rem;border-radius:6px;overflow-x:auto;font-size:13px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem;text-align:left}.rej{color:#8a5a00}.pick{color:#0a6b2d;font-weight:600}</style></head><body>
+<h1>E10 — How smithers actually runs on Vercel (eng doc §2, v3)</h1>
+<p><b>Context.</b> Adversarial review (critical finding 1): the v2 eng doc built a bespoke Postgres state machine and never specified how <em>smithers</em> runs serverlessly — but REQ-8's whole point is proving smithers on Vercel.</p>
+<h2>Decision</h2>
+<ul>
+<li><b>E10.1</b> The summarize pipeline is a smithers workflow; the Sandbox executor runs the smithers runtime <em>in-process, per run</em>, then exits. No resident daemon.</li>
+<li><b>E10.2</b> Smithers persists workflow/run/step state via a <b>Postgres state driver</b> into a <code>smithers</code> schema in the same Neon DB; app <code>run.smithers_run_id</code> joins the two. If the driver doesn't exist / isn't serverless-safe, it is built upstream in smithers first (blocking probe A12).</li>
+<li><b>E10.3</b> The operator UI = custom smithers Gateway UI as Next.js serverless routes reading app + smithers schemas from Postgres. The local <code>bun gateway.ts</code> process is dev-only, never deployed.</li>
+<li><b>E10.4</b> UI Replay / watchdog retry = re-invoke the Sandbox executor for the same <code>run.id</code>, which resumes the same smithers run from the first non-completed step. One resume path for AC-7.3 and AC-9.4.</li>
+</ul>
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td>Bespoke state machine only, smithers just for dev workflows (v2 status quo)</td><td class="rej">Rejected</td><td>Fails the PRD problem statement — the template would prove nothing about smithers on Vercel.</td></tr>
+<tr><td>Long-lived smithers gateway on a VM/container</td><td class="rej">Rejected</td><td>Violates REQ-8/AC-8.1 (no operator-owned long-lived process).</td></tr>
+<tr><td>Smithers state in SQLite on Sandbox ephemeral disk</td><td class="rej">Rejected</td><td>Violates AC-8.2 (single Postgres store); state dies with the sandbox.</td></tr>
+<tr><td class="pick">Per-run in-process smithers runtime + Postgres driver + serverless Gateway read-model</td><td class="pick">Chosen</td><td>Only shape satisfying AC-8.1 + AC-8.2 + REQ-9 simultaneously; step durability subsumes D23's hand-rolled checks.</td></tr>
+</table>
+<h2>Example flow</h2>
+<pre>tick → INSERT run (claim) → invoke Sandbox(run.id)
+Sandbox: acquire lease → smithers.resume(run.smithers_run_id ?? create)
+  step assign      ✓ (done, skipped on resume)
+  step threshold   ✓
+  step summarize   ← crash here → watchdog re-invokes → resumes AT summarize
+  step deliver (E1 protocol inside)
+  step finalize → status='posted'</pre>
+<h2>Risk / probe</h2>
+<p>A12 (blocking): 3-step spike workflow, killed after step 2, must resume in a fresh process against Postgres executing only step 3. Failure ⇒ upstream smithers Postgres-driver milestone precedes app implementation.</p>
+</body></html>

@@ -1,0 +1,16 @@
+Probe run failed: Could not get credentials from OIDC context.
+Please link your Vercel project using `npx vercel link`.
+Then, pull an initial OIDC token with `npx vercel env pull`
+and retry.
+╰▶ Make sure you are loading `.env.local` correctly, or passing $VERCEL_OIDC_TOKEN directly.
+
+Stack:
+LocalOidcContextError: Could not get credentials from OIDC context.
+Please link your Vercel project using `npx vercel link`.
+Then, pull an initial OIDC token with `npx vercel env pull`
+and retry.
+╰▶ Make sure you are loading `.env.local` correctly, or passing $VERCEL_OIDC_TOKEN directly.
+    at getVercelToken (file:///Users/williamcory/vercel-example/artifacts/smithering/probes/A2/node_modules/@vercel/sandbox/dist/utils/get-credentials.js:47:14)
+    at async getCredentials (file:///Users/williamcory/vercel-example/artifacts/smithering/probes/A2/node_modules/@vercel/sandbox/dist/utils/get-credentials.js:64:9)
+    at async Sandbox.create (file:///Users/williamcory/vercel-example/artifacts/smithering/probes/A2/node_modules/@vercel/sandbox/dist/sandbox.js:294:23)
+    at async main (file:///Users/williamcory/vercel-example/artifacts/smithering/probes/A2/run-sandbox-loop.mjs:23:19)

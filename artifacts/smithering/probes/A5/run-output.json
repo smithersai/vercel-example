@@ -1,0 +1,16 @@
+{
+  "startedAt": "2026-07-02T01:02:10.111Z",
+  "finishedAt": "2026-07-02T01:02:13.160Z",
+  "elapsedMs": 3048,
+  "numClients": 60,
+  "iterationsPerClient": 5,
+  "totalOperations": 300,
+  "successCount": 300,
+  "failureCount": 0,
+  "failures": [],
+  "poolStats": {
+    "totalCount": 60,
+    "idleCount": 60,
+    "waitingCount": 0
+  }
+}

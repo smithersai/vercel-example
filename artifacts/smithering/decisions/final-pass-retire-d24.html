@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decision: retire D24 instead of renumbering or backfilling</title>
+<style>
+body{font:15px/1.5 -apple-system,Segoe UI,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}
+code,pre{background:#f4f4f5;border-radius:4px;font-size:.88em}
+pre{padding:.8rem;overflow-x:auto}code{padding:.1em .3em}
+.alt{border:1px solid #ddd;border-radius:6px;padding:.6rem .9rem;margin:.6rem 0}
+.alt b{display:block}
+.chosen{border-color:#2e7d32;background:#f2f8f2}
+del{color:#b3261e;background:#fbeaea;text-decoration:line-through}
+ins{color:#2e7d32;background:#eaf5ea;text-decoration:none}
+small{color:#666}
+</style>
+</head>
+<body>
+<h1>Retire decision ID D24 (fold into D26) rather than renumber or backfill</h1>
+<p><small>Final design pass, 2026-07-01 · docs/planning/02-design.md · orchestrator judgment call</small></p>
+
+<h2>What was decided</h2>
+<p>The approved draft contained a placeholder: <code>**Decision D24 — see also D26 (D8
+chunking's crash-resume interaction).**</code> — a stub with no content of its own; the
+substance (per-chunk delivery ledger) lives entirely in D26. In the final doc, D24 is
+declared a <b>retired ID</b>: a short italic note in §4 explains this, the Decisions
+index (§12) lists it as retired, and the ID is never reused.</p>
+
+<h2>Alternatives considered</h2>
+<div class="alt"><b>A. Renumber D25–D31 down by one (D24…D30)</b>
+Cleanest-looking numbering, but breaks traceability: the draft went through human review,
+and any review comment citing "D26" or "D27" would silently point at a different decision
+in the final doc. Rejected.</div>
+<div class="alt"><b>B. Backfill D24 with new content</b>
+Inventing a new decision just to fill a number would be a substantive design change in a
+pass that is supposed to be polish-only on an approved draft, and anything true worth
+saying there (durable split, ledger skip-if-sent) is already stated in D26/D8. Rejected.</div>
+<div class="alt chosen"><b>C. Retire the ID explicitly (chosen)</b>
+Keeps every other ID stable, costs two sentences, and follows the common RFC/ADR
+convention of "number withdrawn, never reused."</div>
+
+<h2>Source diff (draft → final)</h2>
+<pre><del>**Decision D24 — see also D26 (D8 chunking's crash-resume interaction).**</del>
+<ins>*(D24 is a retired ID: the draft used it as a forward-reference stub to the delivery
+ledger, whose substance lives entirely in D26. Retired rather than renumbered so draft
+review comments citing D25+ stay accurate; D24 is never reused.)*</ins></pre>
+
+<h2>Example of the failure this avoids</h2>
+<p>Reviewer comment on the draft: "D27's outer-loop bound needs an attempt counter." Under
+alternative A, final-doc D27 would be the formatting decision D6's neighbor's content —
+the comment would appear addressed against the wrong text. Under C, D27 still means the
+Telegram retry decision.</p>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Decision: tick → claim → Sandbox architecture shape</title>
+<style>body{font:15px/1.55 -apple-system,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}pre{background:#f5f5f5;padding:.8rem;overflow:auto;border-radius:6px}
+table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.35rem .6rem;text-align:left;vertical-align:top}
+.win{background:#eaf7ea}.note{color:#666;font-size:.9em}</style></head><body>
+<h1>Decision: single 1-minute cron tick → DB claim → Sandbox executor</h1>
+<p class="note">2026-07-01 · docs/planning/03-eng.md §1 · confirms and concretizes design decisions D2/D21–D23</p>
+
+<h2>What was decided</h2>
+<p>One Vercel Cron entry fires <code>/api/cron/tick</code> every minute. The tick only scans
+<code>chat_config</code>, claims due windows with <code>INSERT INTO run … ON CONFLICT (chat_id,
+window_start, window_end) DO NOTHING</code>, and triggers one Vercel Sandbox invocation per
+claimed run, passing <strong>only <code>{runId}</code></strong>. The Sandbox re-reads all state from
+Postgres. The same tick doubles as watchdog for runs stuck in <code>running</code>.</p>
+
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Why rejected / accepted</th></tr>
+<tr class="win"><td><b>Tick + claim + Sandbox fan-out (chosen)</b></td><td>Only shape satisfying all three: no long-lived process (REQ-8), &gt;20-min tasks (REQ-9), one Postgres store (AC-8.2). Matches Vercel's own documented cron pattern and pg-boss's singleton-key claim precedent (eng-oss §1.2, §2.1).</td></tr>
+<tr><td>Do summarization inside the cron Function</td><td>Hits Function execution ceiling; violates AC-9.1's "no short-task shortcut" and can't reach 20 minutes.</td></tr>
+<tr><td>Per-chat Vercel Cron entries</td><td>Cron entries are deploy-time config — AC-6.3 requires schedule changes without redeploy; also per-plan cron-count limits.</td></tr>
+<tr><td>Durable-execution vendor (Inngest/Trigger.dev/Temporal)</td><td>Explicitly rejected by the PRD problem statement — state would live outside the user's Postgres; the whole point of the template is not needing one.</td></tr>
+<tr><td>Rich invocation payload (window, config, messages) instead of just <code>runId</code></td><td>A watchdog re-invocation has no access to the original payload; re-reading by <code>runId</code> makes retry = first-run, one code path (D22/D23).</td></tr>
+</table>
+
+<h2>Example: two concurrent ticks race on the same window</h2>
+<pre>Tick A: INSERT run (chat 7, 14:00–15:00) → inserted 1 row → spawn Sandbox(run 42)
+Tick B: INSERT run (chat 7, 14:00–15:00) → ON CONFLICT DO NOTHING → 0 rows → no spawn
+Result: exactly one run, no app-level locking, verified by the AC-5.3 concurrency test.</pre>
+
+<h2>Diagram</h2>
+<pre>
+Vercel Cron (1m) ─▶ /api/cron/tick ──claim──▶ Postgres(run)
+                        │  └─watchdog: re-invoke stuck runs
+                        └──{runId}──▶ Vercel Sandbox
+                                        │ re-read config/messages/ledger
+                                        ├─▶ Anthropic API (summary JSON)
+                                        └─▶ Telegram (per-chunk, ledger-skipped)
+</pre>
+</body></html>

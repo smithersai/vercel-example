@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision E11 — Machine-endpoint auth boundaries</title>
+<style>body{font:15px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem;text-align:left}.rej{color:#8a5a00}.pick{color:#0a6b2d;font-weight:600}</style></head><body>
+<h1>E11 — Auth for Telegram/Cron callers; D18 scoped to the operator surface (eng doc §12, v3)</h1>
+<p><b>Context.</b> Review (major finding 7): D18 says "all server routes reject requests without the UI token/cookie" — impossible for Telegram and Vercel Cron callers, and v2 specified no auth for them at all (anyone could POST fake messages or force ticks).</p>
+<h2>Decision</h2>
+<table>
+<tr><th>Surface</th><th>Credential</th><th>Mechanism</th></tr>
+<tr><td>Operator UI + operator API</td><td><code>UI_TOKEN</code></td><td>D18 bearer→cookie (unchanged)</td></tr>
+<tr><td><code>/api/telegram/webhook</code></td><td><code>TELEGRAM_WEBHOOK_SECRET</code></td><td><code>secret_token</code> set at <code>setWebhook</code>; Telegram echoes it as <code>X-Telegram-Bot-Api-Secret-Token</code>; constant-time compare, 403 otherwise</td></tr>
+<tr><td><code>/api/cron/tick</code></td><td><code>CRON_SECRET</code></td><td><code>Authorization: Bearer</code> — Vercel injects it on cron invocations</td></tr>
+<tr><td><code>/api/test/*</code></td><td><code>E2E_TEST_ROUTES=1</code> AND <code>UI_TOKEN</code></td><td>route absent unless env flag set; never set in production</td></tr>
+</table>
+<p>Three independent, rotatable, env-supplied secrets (AC-11.3). D18's wording gets a design-doc errata: it governs the operator surface only.</p>
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td>Reuse UI_TOKEN for all three surfaces</td><td class="rej">Rejected</td><td>Telegram can't send it; a single secret leak would open every surface; rotation couples unrelated callers.</td></tr>
+<tr><td>Webhook auth by Telegram source-IP allowlist</td><td class="rej">Rejected</td><td>IP ranges shift; unverifiable behind Vercel's proxy layers; secret_token is the platform-native mechanism.</td></tr>
+<tr><td>No auth on tick ("it's idempotent anyway")</td><td class="rej">Rejected</td><td>Unauthenticated forced ticks enable DB-load abuse and watchdog manipulation.</td></tr>
+<tr><td class="pick">Per-surface secrets as above</td><td class="pick">Chosen</td><td>Platform-native on both machine surfaces; cross-credential rejection is testable.</td></tr>
+</table>
+<p><b>Tests.</b> Each endpoint: 401/403 on missing credential, wrong credential, and the <em>other surface's</em> credential.</p>
+</body></html>

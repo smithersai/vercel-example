@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision: Exactly-once Telegram delivery (E1)</title>
+<style>body{font:16px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}code,pre{background:#f4f4f4;border-radius:4px;padding:2px 5px}pre{padding:12px;overflow-x:auto}h1{font-size:1.5rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px 10px;text-align:left}.win{background:#e8f5e9}.note{background:#fff8e1;padding:10px 14px;border-radius:6px}</style></head><body>
+<h1>E1 — Exactly-once summary delivery over a non-idempotent API</h1>
+<p><b>Context.</b> AC-5.3 forbids duplicate summary posts; AC-9.4 forbids duplicated side effects on resume. Telegram <code>sendMessage</code> has <b>no idempotency key</b> (probe A1). The v1 design (record <code>telegram_message_id</code> after a successful send) fails on the crash cut <i>after provider-ack, before ledger write</i>, and on concurrent executors both seeing an unsent chunk.</p>
+<h2>Decision</h2>
+<p>Two mechanisms, layered:</p>
+<ol>
+<li><b>Single writer</b> — a per-run lease with a fencing token (<code>run.lease_owner</code>, see <a href="lease-watchdog.html">E2</a>); every <code>run_chunk</code> write is fenced, so a concurrent/stale executor's reserve write hits zero rows <i>before</i> it can call Telegram.</li>
+<li><b>Two-phase send</b> per chunk: <code>reserving</code> (write-ahead intent) → send content-free placeholder "…" → record its <code>message_id</code> (<code>reserved</code>) → <code>editMessageText</code> to the real chunk text (<code>edited</code>, idempotent to repeat) → <code>sent</code>.</li>
+</ol>
+<h2>Crash-cut table (the core of the argument)</h2>
+<table><tr><th>Crash between…</th><th>On resume</th><th>Worst outcome</th></tr>
+<tr><td>start → reserving write</td><td>redo from scratch</td><td>none</td></tr>
+<tr><td>reserving → placeholder ack</td><td>send new placeholder</td><td>none (nothing was sent)</td></tr>
+<tr><td><b>placeholder ack → record</b></td><td>send new placeholder, continue</td><td><b>one orphan "…" message</b> — content-free</td></tr>
+<tr><td>record → edit</td><td>edit recorded id</td><td>none</td></tr>
+<tr><td>edit ack → edited/sent write</td><td>re-edit; "message is not modified" = success</td><td>none</td></tr></table>
+<p class="note"><b>Residual — bounded and escalated (v3 revision):</b> a stray "…" placeholder in the rare ack/record cut. Duplicate <i>summary content</i> is impossible by construction. The orphan cannot be deleted (its id was never learned) — the irreducible floor given no idempotency key. <b>Bound:</b> one orphan per attempt crossing the cut, so ≤ <code>max_attempts</code> (5) per run — the invariant test asserts <i>orphans ≤ attempt_count</i>, not "at most one". <b>Escalation:</b> strictly read, REQ-5's "exactly once and intact" and the no-spam stance do not admit even a content-free stray, so this residual is a declared deviation gated on human acceptance (assumption A13 in eng doc §16). Proposed AC-5.3 amendment: "exactly-once applies to summary <i>content</i>; content-free placeholders from crash-during-send are permitted, bounded by the per-run attempt limit." §5 implementation does not start until accepted. The same cut also applies to the E8 disclosure greeting (at-least-once, once per crashed attempt), folded into the same acceptance ask.</p>
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Alternative</th><th>Why rejected</th></tr>
+<tr class="win"><td><b>Placeholder + edit (chosen)</b></td><td>Only content-free op can double; edit is idempotent; fully testable via fault injection.</td></tr>
+<tr><td>Record-after-send only (v1)</td><td>Duplicates full chunk content on the ack/record cut and under executor races — the review's exact objection.</td></tr>
+<tr><td>Mark run <code>failed</code> on ambiguous cut, require operator replay</td><td>Violates AC-5.2 ("posts without manual intervention").</td></tr>
+<tr><td>Reconcile by reading chat history</td><td>Bot API cannot list/read a chat's messages; bots don't receive their own sends via webhook.</td></tr>
+<tr><td>Embed idempotency marker in content, dedupe later</td><td>No read path exists to ever observe the marker (same reason as above).</td></tr>
+</table>
+<h2>Example (3 chunks, crash after chunk 2's placeholder ack)</h2>
+<pre>chat timeline:            ledger (run_chunk):
+[…]→edited to chunk1      #0 sent  id=101
+[…]  ← orphan (id lost)   #1 reserving  ← crash here
+                          resume: new placeholder id=103, edit → chunk2
+[…]→edited to chunk2      #1 sent  id=103
+[…]→edited to chunk3      #2 sent  id=104
+Result: chunks 1,2,3 delivered exactly once + one stray "…".</pre>
+<p><b>Tests:</b> fault-injected kill at every cut × every chunk index; repeated ambiguous cut across N attempts of the same chunk (orphans ≤ N, content still exactly once); concurrent double-executor race; invariant = delivered content multiset ≡ chunk list, orphan placeholders ≤ <code>attempt_count</code>, run ends <code>posted</code>. Red-before-green against the v1 logic.</p>
+</body></html>

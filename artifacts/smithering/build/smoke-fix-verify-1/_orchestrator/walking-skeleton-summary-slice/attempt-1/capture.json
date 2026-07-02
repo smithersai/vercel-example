@@ -1,0 +1,140 @@
+{
+  "verify": {
+    "pass": false,
+    "model": "claude-fable-5",
+    "rebasedTip": {
+      "base": "8c8fed6896fab7739e13550ef05a472f0a87fd6c",
+      "ok": true
+    },
+    "gatesRun": [
+      {
+        "criterionId": "REQ-1.1",
+        "command": "pnpm test:e2e -t \"walking skeleton\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "REQ-1.4",
+        "command": "pnpm test:integration -t \"webhook dedup\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "REQ-3.1",
+        "command": "pnpm test:unit -t \"window header\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "REQ-8.2",
+        "command": "pnpm test:integration -t \"single store\"",
+        "status": "green"
+      },
+      {
+        "criterionId": "tier-unit-full",
+        "command": "pnpm test:unit",
+        "status": "green"
+      },
+      {
+        "criterionId": "tier-integration-full",
+        "command": "pnpm test:integration",
+        "status": "green"
+      },
+      {
+        "criterionId": "tier-e2e-full",
+        "command": "pnpm test:e2e",
+        "status": "green"
+      },
+      {
+        "criterionId": "typecheck",
+        "command": "npx tsc --noEmit",
+        "status": "green"
+      }
+    ],
+    "evidenceChecked": [
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/plan.md",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/diff.patch",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/gates.json",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-1.1.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-1.4.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-3.1.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/test-output/REQ-8.2.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.1-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.1-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.4-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-1.4-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-3.1-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-3.1-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-8.2-red.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/rbg/REQ-8.2-green.log",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/decisions",
+        "ok": true
+      },
+      {
+        "path": "artifacts/smithering/build/smoke-fix-verify-1/walking-skeleton-summary-slice/review.json",
+        "ok": true
+      }
+    ],
+    "infra": false,
+    "feedback": "All Tier-1 gates re-ran green live on the rebased tip (integration tip 8c8fed6; rebase was a no-op) and all declared evidence files exist and are non-empty with correct names. FAIL for one reason: review.json records approved=false with a HIGH finding that is confirmed real and unfixed — eng §4 (docs/planning/03-eng.md:172) requires `message.assigned_run_id bigint FK NULL` but db/migrations/001_core.sql:37 declares `assigned_run_id bigint` with no REFERENCES run(id). The ticket's agent-review verification item ('schema matches eng §4') is therefore unsatisfied. Fix: add `REFERENCES run(id)` to message.assigned_run_id in the migration, re-run gates, and obtain an approved review. Minor note: RBG red logs are genuine failure transcripts, but no failing-first commit exists to re-run (red captured pre-commit); acceptable content-wise, flagged for process hygiene."
+  },
+  "review": {
+    "approved": false,
+    "model": "gpt-5.4",
+    "findings": [
+      {
+        "severity": "high",
+        "title": "Concurrent manual triggers for the same window still send duplicate summaries",
+        "detail": "The D2 run claim is not used as an execution gate. `claimRun()` returns `{ claimed: false }` on the losing side of an `ON CONFLICT DO NOTHING`, but `triggerSummary()` discards that flag and always invokes the executor. Because `executeRun()` only short-circuits after `status='posted'`, two concurrent `POST /api/trigger` calls for the same chat/window produce one `run` row and two `telegram_outbox` rows. Repro on this tree: ingest one message, then `await Promise.all([triggerPost(req()), triggerPost(req())])` for the same payload; the database ends with `outboxCount: 2` and one `run` row. That violates the ticket's D2 claim contract and means the manual run lifecycle is not actually serialized by durable Postgres state.",
+        "file": "src/pipeline.ts:132"
+      }
+    ],
+    "reasons": "Not approved. The earlier assigned_run_id foreign-key issue is fixed and the named gates are green, but the current trigger path still allows the loser of the `(chat_id, window_start, window_end)` claim race to execute the pipeline and duplicate delivery. For this ticket, the manual trigger must treat the Postgres claim as the execution gate."
+  },
+  "challenge": null,
+  "missing": [],
+  "pass": false
+}

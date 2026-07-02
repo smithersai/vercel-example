@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision: Large-window budgeting (E5) + tick backpressure (E7)</title>
+<style>body{font:16px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}code,pre{background:#f4f4f4;border-radius:4px;padding:2px 5px}pre{padding:12px;overflow-x:auto}h1{font-size:1.4rem}h2{font-size:1.15rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px 10px;text-align:left}.win{background:#e8f5e9}</style></head><body>
+<h1>E5 — Large-window input strategy &amp; E7 — tick scale envelope</h1>
+<h2>E5: what happens when a window won't fit one prompt</h2>
+<p><b>Policy tiers</b> (constants in one config module, boundary-tested):</p>
+<table><tr><th>Window size</th><th>Path</th><th>User-visible effect</th></tr>
+<tr><td>≤ 80k est. tokens</td><td>single Summarizer call</td><td>normal summary</td></tr>
+<tr><td>≤ 20 segments × 60k</td><td>map-reduce: per-segment structured summaries → one reduce; participants/links passed verbatim so grounding holds</td><td>normal summary</td></tr>
+<tr><td>beyond one reduce level</td><td><b>recursive (hierarchical) reduce, no level cap</b> — intermediates grouped and reduced until one call remains; paginated fetch (5k rows/page), no message cap</td><td>summary opens "High-volume window (N messages): condensed digest." — a mode disclosure, <i>not</i> a loss</td></tr></table>
+<p><b>v3 revision (review finding 3):</b> the v2 tier "keep newest up to cap + warning" dropped covered messages — a visible but still <i>lossy</i> mode contradicting AC-1.1/AC-2.1, which admit no lossy exception. Replaced with unbounded recursive reduce: every message is read by exactly one map call at any volume; volume now costs time/tokens, never coverage. The lease/heartbeat model (E2) plus the &gt;20-minute Sandbox path (REQ-9) are exactly what make arbitrarily long summarize runs safe, so "unbounded latency" is no longer a valid rejection — that earlier rejection is superseded here.</p>
+<p><b>Alternatives rejected:</b> unbounded single prompt (fails at scale); newest-N truncation with warning (v2 — lossy, violates AC-1.1; would require a PRD amendment the product doesn't want); silent truncation (worse); PRD amendment to permit loss (rejected: recursive reduce achieves the requirement as written).</p>
+<p><b>Tests:</b> exact-budget and budget+1 boundaries; planted-topic coverage across 3-segment and forced 2-level fixtures (first <i>and</i> last segment topics must surface); pagination fuzz around page boundaries; 50k-message benchmark with asserted wall/token ceilings; AC-3.3 grounding eval over map-reduce outputs.</p>
+<h2>E7: bounding the 1-minute tick globally</h2>
+<p><b>Envelope:</b> 500 enabled chats, 50 concurrent runs, tick &lt; 10 s — enforced by a load test, degrading gracefully beyond (backlog drains, never drops — AC-2.5).</p>
+<ul>
+<li>Global <code>TICK_CLAIM_CAP=25</code> per tick (on top of D25's per-chat 20); unclaimed windows stay due.</li>
+<li>Fair scan cursor <code>chat_config.last_claim_scan_at</code> — no chat starvation, partial ticks resume.</li>
+<li><code>MAX_CONCURRENT_RUNS=50</code> gate: claims proceed, invocations defer; the watchdog also sweeps stranded <code>pending</code> claims so deferral is safe.</li>
+<li>Pooled Neon connections; set-based tick queries (probe A5 validates the pool).</li>
+</ul>
+<p><b>Alternatives rejected:</b> uncapped fan-out (v1 — can blow Function runtime/connection limits in an outage backlog); a queue service for backpressure (violates single-Postgres-store REQ-8); collapsing backlog windows into one (violates AC-4.5 per-window independence, already rejected in D25).</p>
+<p><b>Test:</b> seed 200 chats × 10 missed windows; controlled-clock ticks must drain monotonically within caps, no duplicate claims, bounded staleness, tick wall-time asserted.</p>
+</body></html>

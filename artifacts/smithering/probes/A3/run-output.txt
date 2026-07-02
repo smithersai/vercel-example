@@ -1,0 +1,8 @@
+plan=hobby  expr="* * * * *" -> REJECTED: Hobby accounts are limited to daily cron jobs. This cron expression would run more than once per day.
+plan=pro    expr="* * * * *" -> OK
+plan=hobby  expr="0 9 * * *" -> OK
+plan=hobby  expr="*/5 * * * *" -> REJECTED: Hobby accounts are limited to daily cron jobs. This cron expression would run more than once per day.
+
+--- Design check for docs/planning/02-design.md Decision D21 ---
+Hobby: would FAIL deploy — Hobby accounts are limited to daily cron jobs. This cron expression would run more than once per day.
+Pro:   would deploy

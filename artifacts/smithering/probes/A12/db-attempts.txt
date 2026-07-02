@@ -1,0 +1,28 @@
+ node_id | iteration | attempt |   state   | cached | started_at_ms | finished_at_ms 
+---------+-----------+---------+-----------+--------+---------------+----------------
+ step1   |         0 |       1 | finished  |      0 | 1782954504268 |  1782954504291
+ step2   |         0 |       1 | finished  |      0 | 1782954504348 |  1782954504367
+ step3   |         0 |       1 | cancelled |      0 | 1782954504416 |  1782954604069
+ step3   |         0 |       2 | finished  |      0 | 1782954604353 |  1782954610378
+(4 rows)
+
+   run_id    |  status  
+-------------+----------
+ a12-probe-1 | finished
+(1 row)
+
+   run_id    | node_id | iteration | done 
+-------------+---------+-----------+------
+ a12-probe-1 | step1   |         0 |    1
+(1 row)
+
+   run_id    | node_id | iteration | done 
+-------------+---------+-----------+------
+ a12-probe-1 | step2   |         0 |    1
+(1 row)
+
+   run_id    | node_id | iteration | done 
+-------------+---------+-----------+------
+ a12-probe-1 | step3   |         0 |    1
+(1 row)
+

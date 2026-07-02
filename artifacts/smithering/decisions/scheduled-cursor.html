@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision E14 — Scheduled-lineage cursor vs manual runs</title>
+<style>body{font:15px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}pre{background:#f6f8fa;padding:.8rem;border-radius:6px;overflow-x:auto;font-size:13px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem;text-align:left}.rej{color:#8a5a00}.pick{color:#0a6b2d;font-weight:600}</style></head><body>
+<h1>E14 — Manual runs must not corrupt scheduled window continuity (eng doc §6.1, v3)</h1>
+<p><b>Context.</b> Review (major finding 5): the design derives the next scheduled window from "prior run.window_end", and manual runs share the run table. A manual custom window could advance/overlap the scheduled lineage → gaps or overlaps against AC-2.1.</p>
+<h2>Decision</h2>
+<p>Scheduled windows derive from <code>chat_config.sched_cursor</code>, advanced <b>only</b> by the scheduled path (transactionally with the D2 claim). Manual runs never touch it. If a scheduled claim conflicts with an existing row for the <em>identical</em> window (e.g. a manual run already covered exactly it), the cursor still advances — window already handled, no duplicate, no gap. Manual windows overlapping (not matching) scheduled ones are allowed and badged in the UI; AC-2.1 governs the scheduled lineage.</p>
+<h2>Example (the bug this kills)</h2>
+<pre>Hourly schedule, cursor at 14:00.
+Operator manually summarizes [14:30, 14:45).
+v2: next scheduled window computed from prior run.window_end = 14:45
+    → scheduled summary covers [14:45,15:00) — messages 14:00–14:30 NEVER summarized. ✗
+v3: sched_cursor still 14:00 → scheduled run covers [14:00,15:00) as required. ✓
+    (14:30–14:45 appears in both; manual overlap badge shown.)</pre>
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td>Derive from last <em>scheduled</em> run row (filter by trigger)</td><td class="rej">Rejected</td><td>Works until a failed/deleted scheduled row breaks the chain; a cursor column is O(1), race-free with the claim txn, and survives lineage queries.</td></tr>
+<tr><td>Forbid manual windows overlapping the schedule</td><td class="rej">Rejected</td><td>Breaks AC-7.2's "chosen window"; operator intent should win with disclosure, not be blocked.</td></tr>
+<tr><td>Partial unique index per trigger (allow duplicate windows)</td><td class="rej">Rejected</td><td>Would permit duplicate summaries for one window, violating AC-5.3.</td></tr>
+<tr><td class="pick">sched_cursor watermark + conflict-advances rule</td><td class="pick">Chosen</td><td>Gapless/overlap-free scheduled lineage by construction; property-testable over random interleavings.</td></tr>
+</table>
+</body></html>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decision: add a Decisions index section instead of extracting decisions from prose</title>
+<style>
+body{font:15px/1.5 -apple-system,Segoe UI,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}
+.alt{border:1px solid #ddd;border-radius:6px;padding:.6rem .9rem;margin:.6rem 0}
+.alt b{display:block}
+.chosen{border-color:#2e7d32;background:#f2f8f2}
+pre{background:#f4f4f5;border-radius:4px;padding:.8rem;overflow-x:auto;font-size:.88em}
+small{color:#666}
+</style>
+</head>
+<body>
+<h1>Satisfy "keep a Decisions section" via an index table (§12), leaving full decisions inline in context</h1>
+<p><small>Final design pass, 2026-07-01 · docs/planning/02-design.md · orchestrator judgment call</small></p>
+
+<h2>What was decided</h2>
+<p>The final doc's required Decisions section is a <b>32-row index table</b> (ID →
+section → one-line summary, including retired D24), added as §12. The full decision text
+with rationale stays inline in each topical section, exactly as reviewed.</p>
+
+<h2>Alternatives considered</h2>
+<div class="alt"><b>A. Move all decision bodies into one giant Decisions section</b>
+Would strip each decision of its surrounding context (D26 makes sense next to the
+delivery-flow prose, not in a flat list), produce a large diff against the approved
+draft, and risk introducing errors during a polish-only pass. Rejected.</div>
+<div class="alt"><b>B. Duplicate full decision text (inline + Decisions section)</b>
+Two copies of 31 decisions guarantees drift the first time one is edited. Rejected.</div>
+<div class="alt chosen"><b>C. Index table pointing at inline decisions (chosen)</b>
+One-screen scan of everything binding, zero duplication, near-zero diff risk against the
+approved content. This also gives implementers a checklist: each row is a thing the
+implementation phase must honor.</div>
+
+<h2>Example row (input → output)</h2>
+<pre>Inline (§6, unchanged from draft):
+  "Decision D26: delivery is tracked with a delivery ledger, run_chunk (...)"
+
+Index (§12, new):
+  | D26 | §6 | Per-chunk delivery ledger (run_chunk) as the fine-grained idempotency key |</pre>
+</body>
+</html>

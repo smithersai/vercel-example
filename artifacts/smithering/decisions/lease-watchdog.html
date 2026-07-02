@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision: Lease + heartbeat watchdog (E2)</title>
+<style>body{font:16px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}code,pre{background:#f4f4f4;border-radius:4px;padding:2px 5px}pre{padding:12px;overflow-x:auto}h1{font-size:1.5rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px 10px;text-align:left}.win{background:#e8f5e9}</style></head><body>
+<h1>E2 — Run leases, heartbeats, and fenced writes replace the fixed-timeout watchdog</h1>
+<p><b>Context.</b> REQ-9 requires legitimate tasks &gt; 20 minutes; AC-8.1/9.4 require crash recovery. The v1 watchdog ("re-invoke anything <code>running</code> &gt; 30 min") cannot tell a live 45-minute task from a dead one → duplicate live executors racing the delivery path.</p>
+<h2>Decision</h2>
+<p>Each executor start is an <b>attempt</b> that atomically acquires a lease: <code>lease_owner</code> (uuid, doubles as fencing token), <code>lease_expires_at = now()+5min</code>, <code>heartbeat_at</code>, <code>attempt_count++</code>. Heartbeat every 30 s extends the lease (fenced; a failed heartbeat = lease lost = abort immediately). The tick's watchdog re-invokes only runs with <code>lease_expires_at &lt; now()</code> and <code>attempt_count &lt; 5</code>; then finalizes <code>failed</code> with <code>last_error</code>. Every durable executor write carries <code>WHERE lease_owner=$attempt</code>.</p>
+<p><b>Key property:</b> lease TTL (5 min) is decoupled from task duration — a healthy 40-minute task heartbeats ~80× and is never taken over; a crashed one is recovered within ≤5 min.</p>
+<h2>Alternatives</h2>
+<table>
+<tr class="win"><td><b>Lease + heartbeat + fencing (chosen)</b></td><td>Standard (graphile-worker <code>locked_at/locked_by</code>, k8s leases); distinguishes slow from dead; fencing makes stale writers harmless.</td></tr>
+<tr><td>Fixed running-timeout (v1)</td><td>False takeover of slow tasks; no mutual exclusion → duplicate senders.</td></tr>
+<tr><td>Postgres advisory locks held by executor</td><td>Serverless/Sandbox connections via pooler make session-scoped locks unreliable (connection reuse/drop ≠ process death signal).</td></tr>
+<tr><td>External coordination (Redis, workflow engine)</td><td>Violates REQ-8 single-Postgres-store guarantee.</td></tr>
+</table>
+<h2>Example timeline (crash at t=7 min of a 40-min task)</h2>
+<pre>t=0     attempt#1 acquires lease (uuid A), heartbeats 30s
+t=7m    process dies; lease expires t=12m
+t=12m   tick watchdog: lease_expires_at &lt; now → invoke attempt#2 (uuid B)
+t=12m+  attempt#2 re-reads run/run_chunk ledger, resumes at first unsent chunk
+(late)  a revived attempt#1 write: ...WHERE lease_owner='A' → 0 rows → exits</pre>
+<p><b>Tests:</b> concurrent-acquire property test (exactly one winner); slow-but-alive NOT taken over; kill + clock-advance recovery; attempt exhaustion → <code>failed</code>; fenced stale write hits zero rows. UI stall display driven by <code>heartbeat_at</code>.</p>
+</body></html>

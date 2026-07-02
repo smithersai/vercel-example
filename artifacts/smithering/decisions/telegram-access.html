@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Decision E12 — Telegram group-message access gates</title>
+<style>body{font:15px/1.5 -apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}pre{background:#f6f8fa;padding:.8rem;border-radius:6px;overflow-x:auto;font-size:13px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem;text-align:left}.rej{color:#8a5a00}.pick{color:#0a6b2d;font-weight:600}</style></head><body>
+<h1>E12 — Making sure the bot actually receives ordinary group messages (eng doc §13, v3)</h1>
+<p><b>Context.</b> Review (major finding 8): Telegram bots default to <b>privacy mode</b> — they receive only commands/replies in groups. All fakes pass while a real deployment silently summarizes nothing. REQ-1 hinges on this and v2 never mentioned it.</p>
+<h2>Decision — three gates</h2>
+<ol>
+<li><b>Setup gate</b> (README checklist, amends D20): BotFather <code>/setprivacy → Disable</code> <em>before</em> adding the bot to chats (privacy changes apply on re-add); <code>setWebhook</code> with <code>allowed_updates:["message","my_chat_member"]</code> + <code>secret_token</code>.</li>
+<li><b>Automated check</b>: <code>pnpm check:telegram</code> (post-deploy step + operator-UI red banner) fails unless <code>getMe.can_read_all_group_messages === true</code>, webhook URL matches the deployment, <code>allowed_updates</code> includes <code>message</code>, and <code>getWebhookInfo.last_error_date</code> isn't recent.</li>
+<li><b>Live smoke</b> (extends D30): assert a plain human-sent group message lands in <code>message</code> within 60s. Bots cannot see other bots' messages, so this leg is prompted/human-in-the-loop — a platform constraint, recorded, not hidden; the getMe/getWebhookInfo legs run unattended nightly.</li>
+</ol>
+<h2>Failure mode this converts</h2>
+<pre>Before: deploy ✓, e2e ✓ (fakes), bot in chat… every window skipped
+        "below_threshold: 0 &lt; 3" forever. Silent product failure.
+After:  check:telegram fails loudly pre-traffic:
+        "can_read_all_group_messages=false — run /setprivacy Disable and re-add the bot."</pre>
+<h2>Alternatives considered</h2>
+<table>
+<tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td>Docs-only warning</td><td class="rej">Rejected</td><td>Exactly the silent failure the review flagged; nobody reads step 7.</td></tr>
+<tr><td>MTProto user-session test sender for full automation</td><td class="rej">Rejected</td><td>PRD non-goal territory (user-account client); heavy dependency for one assertion.</td></tr>
+<tr><td class="pick">Setup gate + getMe check + prompted smoke</td><td class="pick">Chosen</td><td><code>can_read_all_group_messages</code> makes the critical condition machine-checkable; residual human step is minimal and explicit.</td></tr>
+</table>
+<p><b>Probe A11 (blocking)</b> validates the chain once on a real bot before implementation relies on it.</p>
+</body></html>
