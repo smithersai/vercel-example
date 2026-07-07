@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  SmithersGatewayProvider,
-  SyncProvider,
-  createGatewayCollections,
+  SmithersCollectionsProvider,
   useGatewayActions,
   useGatewayApprovals,
   useGatewayConnectionStatus,
@@ -14,10 +12,6 @@ import {
   useGatewayRuns,
 } from "smithers-orchestrator/gateway-react";
 import {
-  SmithersGatewayClient,
-  createSmithersGatewayTransport,
-} from "smithers-orchestrator/gateway-client";
-import {
   GatewayRunsDashboard,
   GatewayRunsLoadingState,
   approvalKey,
@@ -26,16 +20,6 @@ import {
 } from "./GatewayRunsDashboard";
 
 const runsRequest = { filter: { limit: 50 } };
-const sameOriginBootConfig = {
-  apiVersion: "v1",
-  kind: "gateway",
-  workflowKey: null,
-  mountPath: "/runs",
-  rpcPath: "/v1/rpc",
-  wsPath: "/smithers-ws",
-  assetBasePath: "/runs",
-  props: {},
-};
 
 export default function GatewayRunsClient() {
   const [mounted, setMounted] = useState(false);
@@ -52,31 +36,21 @@ export default function GatewayRunsClient() {
 }
 
 function GatewayRunsProvider() {
-  const { client, collections } = useMemo(() => {
-    globalThis.__SMITHERS_GATEWAY_UI__ = sameOriginBootConfig;
+  const mode = useMemo(() => {
+    // Same-origin by default: /v1/api/* is rewritten to the gateway by
+    // next.config.mjs and gated by the operator cookie in middleware.ts. Set
+    // NEXT_PUBLIC_SMITHERS_GATEWAY_URL only for a directly reachable gateway.
     const gatewayBaseUrl = process.env.NEXT_PUBLIC_SMITHERS_GATEWAY_URL?.trim();
-    const gatewayClient = new SmithersGatewayClient({
-      ...(gatewayBaseUrl ? { baseUrl: gatewayBaseUrl } : {}),
-      client: {
-        id: "vercel-example-next",
-        version: "1.0.0",
-        platform: "nextjs",
-      },
-    });
     return {
-      client: gatewayClient,
-      collections: createGatewayCollections({
-        client: createSmithersGatewayTransport(gatewayClient),
-      }),
+      kind: "local",
+      apiBaseUrl: gatewayBaseUrl || globalThis.location.origin,
     };
   }, []);
 
   return (
-    <SmithersGatewayProvider client={client}>
-      <SyncProvider client={collections}>
-        <GatewayRunsLive />
-      </SyncProvider>
-    </SmithersGatewayProvider>
+    <SmithersCollectionsProvider mode={mode}>
+      <GatewayRunsLive />
+    </SmithersCollectionsProvider>
   );
 }
 

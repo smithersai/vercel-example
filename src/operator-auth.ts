@@ -24,6 +24,8 @@ export function isProtectedOperatorPath(pathname: string): boolean {
     pathname.startsWith("/runs/") ||
     pathname === "/v1/rpc" ||
     pathname.startsWith("/v1/rpc/") ||
+    pathname === "/v1/api" ||
+    pathname.startsWith("/v1/api/") ||
     pathname === "/workflows" ||
     pathname.startsWith("/workflows/") ||
     pathname === "/health" ||

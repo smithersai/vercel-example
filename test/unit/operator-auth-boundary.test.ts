@@ -10,7 +10,16 @@ import {
 
 describe("operator UI auth boundary", () => {
   it("classifies the runs dashboard and Smithers gateway paths as protected", () => {
-    for (const path of ["/runs", "/runs/abc", "/v1/rpc/runs.list", "/workflows/smithering", "/health", "/smithers-ws"]) {
+    for (const path of [
+      "/runs",
+      "/runs/abc",
+      "/v1/rpc/runs.list",
+      "/v1/api/runs",
+      "/v1/api/stream",
+      "/workflows/smithering",
+      "/health",
+      "/smithers-ws",
+    ]) {
       expect(isProtectedOperatorPath(path)).toBe(true);
     }
     expect(isProtectedOperatorPath("/api/trigger")).toBe(false);
