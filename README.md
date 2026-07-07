@@ -2,9 +2,33 @@
 
 A serverless Telegram summary bot: Vercel Functions ingest Telegram webhook updates into
 Postgres, Vercel Cron (or an authenticated manual trigger) claims a summary run for a chat
-window, and a Postgres-backed queue drainer renders a summary and sends it through the
+window, and a Postgres-backed queue drainer summarizes the window and sends it through the
 Telegram Bot API. Local and test runs can opt into a deterministic fake Telegram outbox.
 Postgres is the only state store; every function invocation is stateless.
+
+## Summarization: a pool of in-process SDK agents
+
+The summary itself is produced by a real multi-agent pool, not string concatenation. Inside
+the queue-drainer function, `AgentSummarizerPort` (`src/agentSummarizer.ts`) sends the
+window's transcript to a smithers `AnthropicAgent` / `OpenAIAgent` with a typed zod output
+schema (tl;dr, points, participants) and renders the structured result.
+
+- **Variety / "scale tasks across a variety of agents".** `buildAgentPool` assembles a pool
+  from the configured provider keys: with both keys it spans an Anthropic model and an OpenAI
+  model; with a single provider it still spans two distinct models of that provider. Each run
+  is routed to one agent **deterministically** (an FNV-1a hash of `chatId` + window), so the
+  choice is reproducible and demonstrably spreads load. The chosen agent is recorded on the
+  run row (`run.summary_agent`, e.g. `anthropic:claude-opus-4-8` / `openai:gpt-4o`) so the DB
+  and `/runs` dashboard show the spread.
+- **Serverless correctness — SDK agents only, never CLI agents.** A Vercel Node function is a
+  JS runtime with no container, so it can only run **in-process SDK agents** (`AnthropicAgent`
+  / `OpenAIAgent` extend the AI SDK `ToolLoopAgent` and make plain HTTPS calls). CLI agents
+  (`ClaudeCodeAgent`, `CodexAgent`, …) spawn a vendor binary and cannot run here. See the
+  smithers execution-model docs for the distinction.
+- **Graceful degradation.** When neither `ANTHROPIC_API_KEY` nor `OPENAI_API_KEY` is present
+  (local dev, CI), the container falls back to the deterministic `FixtureSummarizerPort` so
+  the app still works offline and without a network. Unit tests inject a fake pooled agent via
+  the same dependency-injection seam, so they stay green with no API keys.
 
 Planning artifacts live in `docs/planning/` (PRD, design, engineering spec, tickets) and
 `artifacts/smithering/` (research, decisions, probes). Smithers workflows that built this
@@ -39,6 +63,8 @@ Copy `.env.example` to `.env.local` and fill in real values.
 | `TELEGRAM_DELIVERY_MODE` | Optional `fake` for local/e2e outbox mode or `real` to force Bot API delivery outside production |
 | `OPERATOR_SECRET` | Bearer token for the manual trigger and test-only routes |
 | `CRON_SECRET` | Bearer token Vercel Cron sends to `/api/cron/summary` |
+| `ANTHROPIC_API_KEY` | Enables the Anthropic SDK summarizer agent(s) in the pool; without it (and `OPENAI_API_KEY`) summaries fall back to the offline fixture |
+| `OPENAI_API_KEY` | Enables the OpenAI SDK summarizer agent in the pool (paired with Anthropic for cross-provider variety) |
 | `E2E_TEST_ROUTES` | Set to `1` to enable test-only routes (never in production) |
 | `TEST_DATABASE_URL` | Enables the live-Postgres integration suite (tests only) |
 | `POSTGRES_PORT` | Host port for the local docker Postgres (default 5432) |

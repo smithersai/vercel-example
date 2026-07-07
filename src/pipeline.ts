@@ -89,7 +89,9 @@ export async function executeRun(container: ExecutorContainer, runId: number): P
     text: message.text,
     sentAt: new Date(message.sent_at),
   }));
-  const text = renderSummary(await container.summarizer.summarize({ windowStart, windowEnd, messages }));
+  const summary = await container.summarizer.summarize({ chatId, windowStart, windowEnd, messages });
+  const text = renderSummary(summary);
+  const summaryAgent = summary.agent ?? null;
 
   await container.pool.query(
     `INSERT INTO run_chunk (run_id, chunk_index, chunk_text, state)
@@ -127,12 +129,13 @@ export async function executeRun(container: ExecutorContainer, runId: number): P
      SET status = 'posted',
          summary_text = $2,
          input_message_count = $3,
+         summary_agent = $4,
          completed_at = now(),
          lease_owner = NULL,
          lease_expires_at = NULL,
          heartbeat_at = NULL,
          next_attempt_at = NULL
      WHERE id = $1`,
-    [runId, chunkText, messages.length],
+    [runId, chunkText, messages.length, summaryAgent],
   );
 }

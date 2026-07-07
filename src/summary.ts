@@ -7,6 +7,9 @@ export const SummaryMessageSchema = z.object({
 });
 
 export const SummaryInputSchema = z.object({
+  // Optional: lets a multi-agent pool route reproducibly per chat as well as per window.
+  // Absent for callers (and tests) that only supply a window's messages.
+  chatId: z.number().optional(),
   windowStart: z.date(),
   windowEnd: z.date(),
   messages: z.array(SummaryMessageSchema),
@@ -24,6 +27,10 @@ export const SummarySchema = z.object({
       participants: z.array(z.string()),
     }),
   ),
+  // Which summarizer produced this summary — "fixture" for the string-concat fallback,
+  // or the pooled SDK agent label (e.g. "anthropic:claude-opus-4-8"). Persisted on the
+  // run row so the DB / dashboard shows how work spread across agents.
+  agent: z.string().optional(),
 });
 
 export type SummaryMessage = z.infer<typeof SummaryMessageSchema>;
@@ -53,6 +60,7 @@ export class FixtureSummarizerPort implements SummarizerPort {
           participants,
         },
       ],
+      agent: "fixture",
     });
   }
 }

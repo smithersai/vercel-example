@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildContainer } from "@/src/container";
 import type { QueryResult, Queryable } from "@/src/db/types";
+import { FixtureSummarizerPort } from "@/src/summary";
 import { FakeTelegramPort, TelegramBotApiPort } from "@/src/telegram";
 
 const noopPool: Queryable = {
@@ -62,5 +63,34 @@ describe("buildContainer Telegram delivery selection", () => {
     const container = buildContainer({ pool: noopPool });
 
     expect(container.telegram).toBeInstanceOf(FakeTelegramPort);
+  });
+});
+
+describe("buildContainer summarizer selection", () => {
+  it("uses the deterministic fixture summarizer when no provider keys are configured", () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+
+    const container = buildContainer({ pool: noopPool });
+
+    expect(container.summarizer).toBeInstanceOf(FixtureSummarizerPort);
+  });
+
+  it("keeps the fixture summarizer in the automatic-fake test env even when keys are present, so unit tests never hit the network", () => {
+    // NODE_ENV=test → automatic-fake env. Real agent-pool summarization only engages in
+    // production/preview deployments; here we must stay on the offline fixture.
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+    process.env.OPENAI_API_KEY = "sk-openai-test";
+
+    const container = buildContainer({ pool: noopPool });
+
+    expect(container.summarizer).toBeInstanceOf(FixtureSummarizerPort);
+  });
+
+  it("honors an explicit summarizer override", () => {
+    const override = { summarize: async () => ({ window: { start: "", end: "" }, topics: [] }) };
+    const container = buildContainer({ pool: noopPool, summarizer: override });
+
+    expect(container.summarizer).toBe(override);
   });
 });

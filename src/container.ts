@@ -1,3 +1,4 @@
+import { AgentSummarizerPort, buildAgentPool } from "./agentSummarizer";
 import { getPool } from "./db/pool";
 import type { Queryable } from "./db/types";
 import { PostgresRunClaimer } from "./db/run-store";
@@ -62,13 +63,25 @@ function buildTelegramPort(pool: Queryable): TelegramPort {
   return new FakeTelegramPort(pool);
 }
 
+// Select the real summarizer. When provider API keys are present (production/preview),
+// summarize via a pool of in-process SDK agents routed per chat/window. When no keys are
+// configured — and in the automatic-fake test env, so unit tests never hit the network —
+// fall back to the deterministic FixtureSummarizerPort.
+function buildSummarizerPort(): SummarizerPort {
+  const agents = automaticFakeEnv() ? [] : buildAgentPool(process.env);
+  if (agents.length > 0) {
+    return new AgentSummarizerPort(agents);
+  }
+  return new FixtureSummarizerPort();
+}
+
 export function buildContainer(overrides: Partial<Container> = {}): Container {
   const pool = overrides.pool ?? getPool();
   const container = {
     pool,
     runClaimer: overrides.runClaimer ?? new PostgresRunClaimer(pool),
     telegram: overrides.telegram ?? buildTelegramPort(pool),
-    summarizer: overrides.summarizer ?? new FixtureSummarizerPort(),
+    summarizer: overrides.summarizer ?? buildSummarizerPort(),
     clock: overrides.clock ?? new SystemClock(),
     invoker: overrides.invoker,
   } as Container;

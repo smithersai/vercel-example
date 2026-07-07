@@ -4,6 +4,7 @@
   "workspaces": {
     "": {
       "dependencies": {
+        "@smithers-orchestrator/agents": "0.27.0",
         "@tanstack/electric-db-collection": "0.3.11",
         "@tanstack/query-db-collection": "1.0.45",
         "next": "15.5.9",
