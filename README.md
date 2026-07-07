@@ -65,6 +65,8 @@ Copy `.env.example` to `.env.local` and fill in real values.
 | `CRON_SECRET` | Bearer token Vercel Cron sends to `/api/cron/summary` |
 | `ANTHROPIC_API_KEY` | Enables the Anthropic SDK summarizer agent(s) in the pool; without it (and `OPENAI_API_KEY`) summaries fall back to the offline fixture |
 | `OPENAI_API_KEY` | Enables the OpenAI SDK summarizer agent in the pool (paired with Anthropic for cross-provider variety) |
+| `SUMMARY_ANTHROPIC_MODELS` | Optional. Comma-separated Anthropic model ids for the pool (default `claude-opus-4-8,claude-haiku-4-5`); pin exact/current ids without a code change |
+| `SUMMARY_OPENAI_MODELS` | Optional. Comma-separated OpenAI model ids for the pool (default `gpt-4o,gpt-4o-mini`); set to your account's current models |
 | `E2E_TEST_ROUTES` | Set to `1` to enable test-only routes (never in production) |
 | `TEST_DATABASE_URL` | Enables the live-Postgres integration suite (tests only) |
 | `POSTGRES_PORT` | Host port for the local docker Postgres (default 5432) |

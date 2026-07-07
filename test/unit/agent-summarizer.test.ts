@@ -174,4 +174,30 @@ describe("buildAgentPool", () => {
   it("ignores blank keys", () => {
     expect(buildAgentPool({ ANTHROPIC_API_KEY: "   ", OPENAI_API_KEY: "" } as NodeJS.ProcessEnv)).toEqual([]);
   });
+
+  it("pins model ids from SUMMARY_*_MODELS env overrides", () => {
+    const pool = buildAgentPool({
+      ANTHROPIC_API_KEY: "a",
+      OPENAI_API_KEY: "o",
+      SUMMARY_ANTHROPIC_MODELS: "claude-5-custom",
+      SUMMARY_OPENAI_MODELS: "gpt-5.5, gpt-5.5-mini",
+    } as NodeJS.ProcessEnv);
+    expect(pool.map((agent) => agent.label)).toEqual(["anthropic:claude-5-custom", "openai:gpt-5.5"]);
+  });
+
+  it("spreads across two overridden models when only one provider is set", () => {
+    const pool = buildAgentPool({
+      OPENAI_API_KEY: "o",
+      SUMMARY_OPENAI_MODELS: "gpt-5.5,gpt-5.5-mini",
+    } as NodeJS.ProcessEnv);
+    expect(pool.map((agent) => agent.label)).toEqual(["openai:gpt-5.5", "openai:gpt-5.5-mini"]);
+  });
+
+  it("does not fabricate a second model when only one override id is given", () => {
+    const pool = buildAgentPool({
+      ANTHROPIC_API_KEY: "a",
+      SUMMARY_ANTHROPIC_MODELS: "solo-model",
+    } as NodeJS.ProcessEnv);
+    expect(pool.map((agent) => agent.label)).toEqual(["anthropic:solo-model"]);
+  });
 });

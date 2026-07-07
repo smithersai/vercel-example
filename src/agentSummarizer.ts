@@ -61,9 +61,20 @@ function compact(value: string | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-// Default model ids for the pool; overridable via env so a deployment can pin exact models.
-const ANTHROPIC_MODELS = ["claude-opus-4-8", "claude-haiku-4-5"] as const;
-const OPENAI_MODEL = "gpt-4o";
+// Default model ids for the pool. Override via SUMMARY_ANTHROPIC_MODELS /
+// SUMMARY_OPENAI_MODELS (comma-separated) so a deployment can pin exact/current
+// models without a code change. The first id is the primary; a second id is used
+// to spread work when only one provider is configured.
+const DEFAULT_ANTHROPIC_MODELS = ["claude-opus-4-8", "claude-haiku-4-5"];
+const DEFAULT_OPENAI_MODELS = ["gpt-4o", "gpt-4o-mini"];
+
+function modelsFromEnv(value: string | undefined, fallback: readonly string[]): string[] {
+  const parsed = compact(value)
+    ?.split(",")
+    .map((m) => m.trim())
+    .filter((m) => m.length > 0);
+  return parsed && parsed.length > 0 ? parsed : [...fallback];
+}
 
 // Build the pool of in-process SDK summarizer agents from the environment.
 //
@@ -77,42 +88,23 @@ const OPENAI_MODEL = "gpt-4o";
 export function buildAgentPool(env: NodeJS.ProcessEnv = process.env): PooledSummaryAgent[] {
   const anthropicKey = compact(env.ANTHROPIC_API_KEY);
   const openaiKey = compact(env.OPENAI_API_KEY);
+  const anthropicModels = modelsFromEnv(env.SUMMARY_ANTHROPIC_MODELS, DEFAULT_ANTHROPIC_MODELS);
+  const openaiModels = modelsFromEnv(env.SUMMARY_OPENAI_MODELS, DEFAULT_OPENAI_MODELS);
+  const anthropicAgent = (model: string) =>
+    toPooledAgent(`anthropic:${model}`, new AnthropicAgent({ model, instructions: SYSTEM_INSTRUCTIONS }));
+  const openaiAgent = (model: string) =>
+    toPooledAgent(`openai:${model}`, new OpenAIAgent({ model, instructions: SYSTEM_INSTRUCTIONS }));
   const pool: PooledSummaryAgent[] = [];
 
-  if (anthropicKey) {
-    pool.push(
-      toPooledAgent(
-        `anthropic:${ANTHROPIC_MODELS[0]}`,
-        new AnthropicAgent({ model: ANTHROPIC_MODELS[0], instructions: SYSTEM_INSTRUCTIONS }),
-      ),
-    );
-  }
-  if (openaiKey) {
-    pool.push(
-      toPooledAgent(
-        `openai:${OPENAI_MODEL}`,
-        new OpenAIAgent({ model: OPENAI_MODEL, instructions: SYSTEM_INSTRUCTIONS }),
-      ),
-    );
-  }
-  // With only one provider configured, add a second distinct model so the pool still
-  // demonstrates spreading across agents.
+  if (anthropicKey) pool.push(anthropicAgent(anthropicModels[0]));
+  if (openaiKey) pool.push(openaiAgent(openaiModels[0]));
+
+  // With only one provider configured, add a second distinct model of that
+  // provider so the pool still spreads across agents (skip when only one model
+  // id was configured for it).
   if (pool.length === 1) {
-    if (anthropicKey) {
-      pool.push(
-        toPooledAgent(
-          `anthropic:${ANTHROPIC_MODELS[1]}`,
-          new AnthropicAgent({ model: ANTHROPIC_MODELS[1], instructions: SYSTEM_INSTRUCTIONS }),
-        ),
-      );
-    } else if (openaiKey) {
-      pool.push(
-        toPooledAgent(
-          "openai:gpt-4o-mini",
-          new OpenAIAgent({ model: "gpt-4o-mini", instructions: SYSTEM_INSTRUCTIONS }),
-        ),
-      );
-    }
+    if (anthropicKey && anthropicModels[1]) pool.push(anthropicAgent(anthropicModels[1]));
+    else if (openaiKey && openaiModels[1]) pool.push(openaiAgent(openaiModels[1]));
   }
 
   return pool;
