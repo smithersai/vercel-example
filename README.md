@@ -96,8 +96,9 @@ Run the Smithers gateway and the app in separate terminals:
    validates the token, sets an HttpOnly Secure SameSite=Lax cookie, and redirects
    to `/runs` so the token is not left in the dashboard URL or client JavaScript.
 
-`next.config.mjs` rewrites `/v1/rpc/*`, `/workflows/*`, `/health`, and the
-dashboard WebSocket path `/smithers-ws` to `SMITHERS_GATEWAY_URL`, defaulting to
+`next.config.mjs` rewrites `/v1/rpc/*`, `/v1/api/*` (the dashboard's REST +
+SSE data plane), `/workflows/*`, `/health`, and the WebSocket path
+`/smithers-ws` to `SMITHERS_GATEWAY_URL`, defaulting to
 `http://127.0.0.1:7331`. These proxy paths use the same operator cookie and fail
 closed when `OPERATOR_SECRET` is missing. The dashboard waits until browser mount
 to connect, so production builds do not fetch the gateway. Set
@@ -126,7 +127,10 @@ and push to `main`.
 
 1. Create or link the Vercel project with `vercel link`.
 2. Attach a Postgres database, such as Neon through the Vercel Marketplace, and set
-   `DATABASE_URL` for Preview and Production.
+   `DATABASE_URL` for Preview and Production. Use the **pooled** connection string
+   (Neon's PgBouncer endpoint, the one with `-pooler` in the host) — every serverless
+   function instance opens its own small `pg` pool, so direct connections exhaust
+   Postgres connection limits under concurrency.
 3. Set these required secrets in Vercel for the target environment:
    `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`, `OPERATOR_SECRET`, and
    `CRON_SECRET`. Production startup fails fast when `TELEGRAM_BOT_TOKEN` is
@@ -145,6 +149,12 @@ and push to `main`.
 7. Register the Telegram webhook for the deployed URL:
    `curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" -d "url=https://<deployment-host>/api/telegram/webhook" -d "secret_token=$TELEGRAM_WEBHOOK_SECRET"`.
 
-`vercel.json` schedules Vercel Cron to hit `/api/cron/summary` hourly in
-Production. Vercel adds `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET`
-is configured on the project, matching the route's bearer-token check.
+`vercel.json` schedules Vercel Cron to hit `/api/cron/summary` (daily at 00:00
+UTC) and `/api/queue/drain` (daily at 00:30 UTC) in Production. Vercel's Hobby
+plan caps cron jobs at once per day, so the schedules are daily; the cron route
+windows summaries with a per-chat `sched_cursor`, so a wider window still covers
+every message and nothing is dropped. On the Pro plan you can tighten the
+schedules in `vercel.json` (e.g. hourly), and `/api/trigger` provides an
+on-demand summary for any chat window regardless of plan. Vercel adds
+`Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is configured on the
+project, matching the routes' bearer-token check.
