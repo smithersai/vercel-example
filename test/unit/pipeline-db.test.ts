@@ -356,6 +356,7 @@ describe("executeRun", () => {
       { rows: [{ chunk_text: "Summary for 2026-07-02T00:00:00.000Z\n\n- ship\n- verify" }], rowCount: 1 },
       { rows: [], rowCount: 1 },
       { rows: [], rowCount: 1 },
+      { rows: [], rowCount: 1 }, // best-effort UPDATE run SET summary_agent
     ]);
     const sentTexts: string[] = [];
 
@@ -375,7 +376,64 @@ describe("executeRun", () => {
 
     expect(sentTexts[0]).toContain("- ship");
     expect(sentTexts[0]).toContain("- verify");
-    expect(pool.calls).toHaveLength(8);
+    expect(pool.calls).toHaveLength(9); // +1: best-effort summary_agent UPDATE, separate from run completion
+  });
+
+  it("still completes the run when summary_agent column is missing (deploy-before-migrate)", async () => {
+    // The run is marked 'posted' BEFORE the best-effort summary_agent write, and a
+    // Postgres undefined_column (42703) on that write is swallowed -- so deploying
+    // the code before migration 003 does not wedge the run in 'running' (which
+    // would make every drainer retry re-summarize, a paid model call).
+    const undefinedColumn = Object.assign(new Error('column "summary_agent" of relation "run" does not exist'), {
+      code: "42703",
+    });
+    const pool = new ScriptedPool([
+      {
+        rows: [
+          {
+            chat_id: "42",
+            window_start: new Date("2026-07-02T00:00:00.000Z"),
+            window_end: new Date("2026-07-02T01:00:00.000Z"),
+            status: "pending",
+          },
+        ],
+        rowCount: 1,
+      },
+      { rows: [], rowCount: 1 },
+      {
+        rows: [{ from_user: "alice", text: "ship", sent_at: new Date("2026-07-02T00:10:00.000Z") }],
+        rowCount: 1,
+      },
+      { rows: [], rowCount: 1 },
+      { rows: [], rowCount: 1 },
+      { rows: [{ chunk_text: "Summary\n\n- ship" }], rowCount: 1 },
+      { rows: [], rowCount: 1 },
+      { rows: [], rowCount: 1 }, // UPDATE run status='posted' (run completes here)
+      undefinedColumn, // best-effort UPDATE run SET summary_agent -> 42703, must be swallowed
+    ]);
+    const sentTexts: string[] = [];
+
+    await expect(
+      executeRun(
+        {
+          pool,
+          telegram: {
+            async sendMessage({ text }) {
+              sentTexts.push(text);
+              return { messageId: 444 };
+            },
+          },
+          summarizer: new FixtureSummarizerPort(),
+        },
+        902,
+      ),
+    ).resolves.toBeUndefined();
+
+    // The Telegram message was delivered and the run reached the completion UPDATE
+    // before the swallowed 42703 -- exactly one summary_agent write was attempted.
+    expect(sentTexts[0]).toContain("- ship");
+    expect(pool.calls).toHaveLength(9);
+    expect(pool.calls[8].text).toContain("summary_agent");
   });
 
   it("rethrows when execution blows up mid-run so the drainer can mark retry state", async () => {
@@ -462,6 +520,9 @@ describe("executeRun", () => {
           return { rows: [], rowCount: 1 };
         }
         if (text.includes("UPDATE run") && text.includes("summary_text")) {
+          return { rows: [], rowCount: 1 };
+        }
+        if (text.includes("UPDATE run SET summary_agent")) {
           return { rows: [], rowCount: 1 };
         }
         throw new Error(`unexpected query: ${text}`);

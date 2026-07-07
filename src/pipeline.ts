@@ -129,13 +129,23 @@ export async function executeRun(container: ExecutorContainer, runId: number): P
      SET status = 'posted',
          summary_text = $2,
          input_message_count = $3,
-         summary_agent = $4,
          completed_at = now(),
          lease_owner = NULL,
          lease_expires_at = NULL,
          heartbeat_at = NULL,
          next_attempt_at = NULL
      WHERE id = $1`,
-    [runId, chunkText, messages.length, summaryAgent],
+    [runId, chunkText, messages.length],
   );
+  // summary_agent lives behind migration 003, and migrations are operator-run
+  // (not applied on boot/deploy). If the code deploys before the migration, a
+  // missing column must NOT wedge the run in 'running' -- that would make every
+  // drainer retry re-summarize, a paid model call each time. The run is already
+  // marked 'posted' above; record the agent best-effort and swallow Postgres
+  // undefined_column (42703).
+  try {
+    await container.pool.query(`UPDATE run SET summary_agent = $2 WHERE id = $1`, [runId, summaryAgent]);
+  } catch (err) {
+    if ((err as { code?: string } | null)?.code !== "42703") throw err;
+  }
 }
